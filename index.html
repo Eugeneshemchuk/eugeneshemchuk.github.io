@@ -30,10 +30,16 @@
 <body>
   <main>
     <header class="intro">
-      <p class="intro__hello">Hello,</p>
-      <h1>I'm Eugene.</h1>
-      <p class="intro__lede">I'm a freelance engineer in Amsterdam building agentic AI systems and AI products. Outside of work I take photographs, bake sourdough, make music, teach, and I'm building an off-grid community in Central Portugal.</p>
-      <p class="intro__sub">Each of those lives in its own album below. Some are finished, some are still in progress.</p>
+      <picture class="intro__photo">
+        <source type="image/webp" srcset="covers/eugene-400.webp 400w, covers/eugene-800.webp 800w" sizes="(min-width: 768px) 400px, 160px" />
+        <img src="covers/eugene-800.jpg" srcset="covers/eugene-400.jpg 400w, covers/eugene-800.jpg 800w" sizes="(min-width: 768px) 400px, 160px" width="800" height="800" alt="Portrait of Eugene Shemchuk" fetchpriority="high" />
+      </picture>
+      <div class="intro__text">
+        <p class="intro__hello">Hello,</p>
+        <h1>I'm Eugene.</h1>
+        <p class="intro__lede">I'm a freelance engineer in Amsterdam building agentic AI systems and AI products. Outside of work I take photographs, bake sourdough, make music, teach, and I'm building an off-grid community in Central Portugal.</p>
+        <p class="intro__sub">Each of those lives in its own album below. Some are finished, some are still in progress.</p>
+      </div>
     </header>
 
     <section class="albums" aria-labelledby="albums-heading">
@@ -45,8 +51,8 @@
           <a class="album__link" href="Portfolio/">
             <span class="album__cover" aria-hidden="true">
               <picture>
-                <source type="image/webp" srcset="covers/portfolio-360.webp 360w, covers/portfolio-720.webp 558w" sizes="(min-width: 600px) 340px, 92vw" />
-                <img src="covers/portfolio-720.jpg" srcset="covers/portfolio-360.jpg 360w, covers/portfolio-720.jpg 558w" sizes="(min-width: 600px) 340px, 92vw" width="558" height="698" alt="" decoding="async" />
+                <source type="image/webp" srcset="covers/portfolio-360.webp 360w, covers/portfolio-720.webp 720w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/portfolio-720.jpg" srcset="covers/portfolio-360.jpg 360w, covers/portfolio-720.jpg 720w" sizes="(min-width: 600px) 340px, 92vw" width="720" height="900" alt="" decoding="async" />
               </picture>
             </span>
             <h3 class="album__title">Portfolio</h3>

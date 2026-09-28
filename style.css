@@ -73,8 +73,37 @@ a:focus-visible {
 
 /* Intro */
 .intro {
+  display: grid;
+  gap: var(--space-6);
   padding-block: var(--space-8) var(--space-7);
+}
+
+.intro__text {
   max-width: 42rem;
+}
+
+.intro__photo img {
+  display: block;
+  width: 160px;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+/* Photo sits to the right of the text on wider screens */
+@media (min-width: 768px) {
+  .intro {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+    align-items: center;
+    gap: var(--space-7);
+  }
+
+  .intro__photo {
+    order: 1;
+  }
+
+  .intro__photo img {
+    width: 100%;
+  }
 }
 
 .intro__hello {
