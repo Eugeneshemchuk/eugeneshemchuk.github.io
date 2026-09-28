@@ -40,10 +40,15 @@
       <h2 id="albums-heading" class="albums__heading">Albums</h2>
 
       <ul class="albums__grid">
-        <!-- To add a cover image: put an <img src="covers/NAME.jpg" alt="" width="800" height="1000"> inside .album__cover -->
+        <!-- Covers: drop originals in content/covers/<album>/, optimised copies live in covers/<album>-360|720.webp|jpg -->
         <li class="album" style="--tint: var(--tint-portfolio); --on-tint: var(--on-dark);">
           <a class="album__link" href="Portfolio/">
-            <span class="album__cover" aria-hidden="true"><span class="album__mark">Portfolio</span></span>
+            <span class="album__cover" aria-hidden="true">
+              <picture>
+                <source type="image/webp" srcset="covers/portfolio-360.webp 360w, covers/portfolio-720.webp 558w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/portfolio-720.jpg" srcset="covers/portfolio-360.jpg 360w, covers/portfolio-720.jpg 558w" sizes="(min-width: 600px) 340px, 92vw" width="558" height="698" alt="" decoding="async" />
+              </picture>
+            </span>
             <h3 class="album__title">Portfolio</h3>
             <p class="album__desc">Agentic AI and AI product engineering. Freelance work, projects, and how to hire me.</p>
             <span class="album__meta">Open album →</span>
@@ -52,7 +57,12 @@
 
         <li class="album" style="--tint: var(--tint-photography); --on-tint: var(--on-dark);">
           <a class="album__link" href="photography/">
-            <span class="album__cover" aria-hidden="true"><span class="album__mark">Photography</span></span>
+            <span class="album__cover" aria-hidden="true">
+              <picture>
+                <source type="image/webp" srcset="covers/photography-360.webp 360w, covers/photography-720.webp 720w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/photography-720.jpg" srcset="covers/photography-360.jpg 360w, covers/photography-720.jpg 720w" sizes="(min-width: 600px) 340px, 92vw" width="720" height="900" alt="" decoding="async" />
+              </picture>
+            </span>
             <h3 class="album__title">Photography</h3>
             <p class="album__desc">My photographs, organised into albums.</p>
             <span class="album__meta">Open album →</span>
@@ -61,7 +71,12 @@
 
         <li class="album album--wip" style="--tint: var(--tint-bakes); --on-tint: var(--on-light);">
           <div class="album__link">
-            <span class="album__cover" aria-hidden="true"><span class="album__mark">Eugene Bakes</span></span>
+            <span class="album__cover" aria-hidden="true">
+              <picture>
+                <source type="image/webp" srcset="covers/bakes-360.webp 360w, covers/bakes-720.webp 720w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/bakes-720.jpg" srcset="covers/bakes-360.jpg 360w, covers/bakes-720.jpg 720w" sizes="(min-width: 600px) 340px, 92vw" width="720" height="900" alt="" decoding="async" />
+              </picture>
+            </span>
             <h3 class="album__title">Eugene Bakes</h3>
             <p class="album__desc">My sourdough shenanigans.</p>
             <span class="album__meta">In progress</span>
@@ -70,7 +85,12 @@
 
         <li class="album album--wip" style="--tint: var(--tint-plays); --on-tint: var(--on-dark);">
           <div class="album__link">
-            <span class="album__cover" aria-hidden="true"><span class="album__mark">Eugene Plays</span></span>
+            <span class="album__cover" aria-hidden="true">
+              <picture>
+                <source type="image/webp" srcset="covers/plays-360.webp 360w, covers/plays-720.webp 720w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/plays-720.jpg" srcset="covers/plays-360.jpg 360w, covers/plays-720.jpg 720w" sizes="(min-width: 600px) 340px, 92vw" width="720" height="900" alt="" decoding="async" loading="lazy" />
+              </picture>
+            </span>
             <h3 class="album__title">Eugene Plays</h3>
             <p class="album__desc">My music projects.</p>
             <span class="album__meta">In progress</span>
@@ -79,7 +99,12 @@
 
         <li class="album album--wip" style="--tint: var(--tint-teaches); --on-tint: var(--on-light);">
           <div class="album__link">
-            <span class="album__cover" aria-hidden="true"><span class="album__mark">Eugene Teaches</span></span>
+            <span class="album__cover" aria-hidden="true">
+              <picture>
+                <source type="image/webp" srcset="covers/teaches-360.webp 360w, covers/teaches-720.webp 720w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/teaches-720.jpg" srcset="covers/teaches-360.jpg 360w, covers/teaches-720.jpg 720w" sizes="(min-width: 600px) 340px, 92vw" width="720" height="900" alt="" decoding="async" loading="lazy" />
+              </picture>
+            </span>
             <h3 class="album__title">Eugene Teaches</h3>
             <p class="album__desc">My courses.</p>
             <span class="album__meta">In progress</span>
@@ -88,7 +113,12 @@
 
         <li class="album album--wip" style="--tint: var(--tint-tribe); --on-tint: var(--on-dark);">
           <div class="album__link">
-            <span class="album__cover" aria-hidden="true"><span class="album__mark">TRIBE Community</span></span>
+            <span class="album__cover" aria-hidden="true">
+              <picture>
+                <source type="image/webp" srcset="covers/tribe-360.webp 360w, covers/tribe-720.webp 720w" sizes="(min-width: 600px) 340px, 92vw" />
+                <img src="covers/tribe-720.jpg" srcset="covers/tribe-360.jpg 360w, covers/tribe-720.jpg 720w" sizes="(min-width: 600px) 340px, 92vw" width="720" height="900" alt="" decoding="async" loading="lazy" />
+              </picture>
+            </span>
             <h3 class="album__title">TRIBE Community</h3>
             <p class="album__desc">An off-grid community project and retreat center in Central Portugal.</p>
             <span class="album__meta">In progress</span>

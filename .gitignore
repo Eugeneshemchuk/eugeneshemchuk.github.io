@@ -1,0 +1,3 @@
+# Raw images: dropped here, optimised into /covers, never served
+content/
+.DS_Store
