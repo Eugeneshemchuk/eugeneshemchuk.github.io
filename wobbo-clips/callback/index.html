@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Connect TikTok - Wobbo Clips</title>
+  <link rel="icon" href="../icon.png" />
+  <link rel="stylesheet" href="../legal.css" />
+</head>
+<body>
+<main>
+  <header><img src="../icon.png" alt="" /><a href="../">Wobbo Clips</a></header>
+  <h1 id="title">Connecting TikTok</h1>
+  <p id="msg">Nothing to show - this page is opened by TikTok after you approve access.</p>
+  <div class="card" id="box" hidden>
+    <div class="code" id="url"></div>
+    <p><button id="copy">Copy URL</button> <span id="copied" hidden>Copied.</span></p>
+  </div>
+</main>
+<script>
+  // The authorization code stays in this browser tab - nothing is sent anywhere.
+  const q = new URLSearchParams(location.search);
+  const title = document.getElementById("title"), msg = document.getElementById("msg");
+  if (q.get("code")) {
+    title.textContent = "Almost done";
+    msg.textContent = "Copy this full URL and paste it into the terminal where `python tiktok.py auth` is waiting. The code expires in a few minutes.";
+    document.getElementById("url").textContent = location.href;
+    document.getElementById("box").hidden = false;
+    document.getElementById("copy").onclick = async () => {
+      try { await navigator.clipboard.writeText(location.href); document.getElementById("copied").hidden = false; } catch (e) {}
+    };
+  } else if (q.get("error")) {
+    title.textContent = "TikTok connection failed";
+    msg.textContent = (q.get("error_description") || q.get("error")) + ". Start the auth step again.";
+  }
+</script>
+</body>
+</html>
