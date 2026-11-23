@@ -1,0 +1,68 @@
+<!doctype html>
+<!-- 3 · Morgen: types the phrase once, hesitates, then copy-pastes it (doubling) until the wall is full; then it all fades to "morgen." and loops. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Morgen</title>
+<style>
+  html,body{margin:0;height:100%;background:#2b313a;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh}
+</style></head><body><canvas id="c"></canvas>
+<script>
+(function () {
+  var PHRASE = "START LEARNING THE FUCKING DUTCH!!! ";
+  var FONT_PX = 15, LINE = 1.5, INK = "#cfd4da", DIM = "#7d8691";
+  var TYPE_CPS = 11, HESITATE = 1.6, PASTE_GAP = .55, HOLD = 2.8, FADE = 2.6, REST = 3.0;
+  var cv = document.getElementById("c"), x = cv.getContext("2d");
+  var dpr, W, H, cw, ch, cols, rows, cap, order;
+
+  function setup() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.font = "600 " + FONT_PX + "px ui-monospace, Menlo, monospace";
+    cw = x.measureText("M").width; ch = FONT_PX * LINE;
+    cols = Math.floor((W - 8) / cw); rows = Math.ceil(H / ch); cap = cols * rows;
+    order = new Float32Array(cap); for (var i = 0; i < cap; i++) order[i] = Math.random();
+  }
+  addEventListener("resize", setup); setup();
+
+  var L = PHRASE.length, t0 = performance.now();
+  function frame(now) {
+    var full = Math.ceil(cap / L);                         // phrases needed to fill the wall
+    var pastes = Math.ceil(Math.log2(full));               // each paste doubles the text
+    var tType = L / TYPE_CPS, tFull = tType + HESITATE + pastes * PASTE_GAP;
+    var tEnd = tFull + HOLD + FADE + REST;
+    var t = ((now - t0) / 1000) % tEnd;
+
+    var chars, label = "", fade = 0, blink = Math.floor(t * 2) % 2 === 0;
+    if (t < tType) chars = Math.floor(t * TYPE_CPS);
+    else if (t < tType + HESITATE) chars = L;
+    else if (t < tFull) { var p = Math.floor((t - tType - HESITATE) / PASTE_GAP) + 1; chars = Math.pow(2, p) * L; label = "⌘V ×" + Math.pow(2, p); }
+    else { chars = cap; fade = Math.max(0, Math.min(1, (t - tFull - HOLD) / FADE)); }
+    chars = Math.min(chars, cap);
+
+    x.fillStyle = "#2b313a"; x.fillRect(0, 0, W, H);
+    x.font = "600 " + FONT_PX + "px ui-monospace, Menlo, monospace"; x.textAlign = "left";
+    x.fillStyle = INK;
+    for (var i = 0; i < chars; i++) {
+      if (fade > 0 && order[i] < fade) continue;           // the wall crumbles, char by char
+      var c = PHRASE[i % L]; if (c === " ") continue;
+      x.fillText(c, 4 + (i % cols) * cw, Math.floor(i / cols) * ch + FONT_PX);
+    }
+    if (chars < cap && blink) {                            // text cursor
+      x.fillRect(4 + (chars % cols) * cw, Math.floor(chars / cols) * ch + 2, 2, FONT_PX + 2);
+    }
+    if (label) {
+      x.font = "600 13px ui-monospace, Menlo, monospace"; x.textAlign = "right";
+      x.fillStyle = "#2b313aee"; x.fillRect(W - 110, H - 34, 100, 24);
+      x.fillStyle = "#ff8a3d"; x.fillText(label, W - 18, H - 17);
+    }
+    if (fade > .6) {
+      x.globalAlpha = Math.min(1, (fade - .6) / .4);
+      x.font = "italic 400 " + Math.round(FONT_PX * 1.3) + "px Georgia, serif"; x.textAlign = "center";
+      x.fillStyle = DIM; x.fillText("morgen.", W / 2, H / 2);
+      x.globalAlpha = 1;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

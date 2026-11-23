@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- 2c · Closing in: moving the cursor keeps the wall away; stay still and it closes in on you and turns red. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Closing In</title>
+<style>
+  html,body{margin:0;height:100%;background:#2b313a;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;cursor:none;touch-action:none}
+  #clock{position:fixed;right:16px;bottom:12px;font:600 12px ui-monospace,Menlo,monospace;color:#8a929c;
+    background:#2b313acc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+</style></head><body><canvas id="c"></canvas><div id="clock"></div>
+<script>
+(function () {
+  var PHRASE = "FUCKING START LEARNING DUTCH ALREADY ";
+  var FONT_PX = 15, LINE = 1.55, R_MAX = 230, CALM = 2.5;   // CALM: sec of stillness before it closes in
+  var BASE = [205, 210, 216], RED = [255, 70, 55];
+  var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
+  var dpr, W, H, cw, ch, cols, rows, N, gx, gy, ox, oy, vx, vy;
+  var mouse = { x: innerWidth / 2, y: innerHeight / 2, on: false }, busy = 0, still = 0, lastX = 0, lastY = 0;
+
+  function setup() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.font = "600 " + FONT_PX + "px ui-monospace, Menlo, monospace";
+    cw = x.measureText("M").width; ch = FONT_PX * LINE;
+    cols = Math.ceil(W / cw); rows = Math.ceil(H / ch) + 1; N = cols * rows;
+    gx = new Float32Array(N); gy = new Float32Array(N); ox = new Float32Array(N); oy = new Float32Array(N);
+    vx = new Float32Array(N); vy = new Float32Array(N);
+    for (var i = 0; i < N; i++) { gx[i] = (i % cols) * cw; gy[i] = Math.floor(i / cols) * ch + FONT_PX; }
+  }
+  addEventListener("resize", setup); setup();
+  function move(e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; }
+  addEventListener("pointermove", move); addEventListener("pointerdown", move);
+  document.addEventListener("pointerleave", function () { mouse.on = false; });
+
+  var t0 = performance.now(), prev = t0, L = PHRASE.length;
+  function frame(now) {
+    var dt = Math.min(.05, (now - prev) / 1000); prev = now;
+    var sp = Math.hypot(mouse.x - lastX, mouse.y - lastY); lastX = mouse.x; lastY = mouse.y;
+    // moving = looking busy: it buys a clear space. Stillness eats it.
+    busy = Math.min(1, busy + sp * .004);
+    if (sp < 1) still += dt; else still = Math.max(0, still - dt * 4);
+    if (still > CALM) busy = Math.max(0, busy - dt * .35);
+    var R = R_MAX * busy, pull = Math.max(0, Math.min(1, (still - CALM - 2) / 6));
+    clock.textContent = still > CALM ? "sitting still " + still.toFixed(1) + "s" : "keeping busy";
+
+    x.fillStyle = "#2b313a"; x.fillRect(0, 0, W, H);
+    var mx = mouse.x, my = mouse.y;
+    for (var i = 0; i < N; i++) {
+      var px = gx[i] + ox[i], py = gy[i] - FONT_PX * .35 + oy[i];
+      var dx = px - mx, dy = py - my, d = Math.hypot(dx, dy) + .001;
+      if (d < R) { var f = 1 - d / R; f = f * f * 7; vx[i] += dx / d * f; vy[i] += dy / d * f; }
+      var hd = Math.hypot(gx[i] - mx, gy[i] - my);
+      if (pull > 0 && hd < 320) {                       // after long stillness the wall leans in on you
+        var k = pull * (1 - hd / 320) * .9; vx[i] -= dx / d * k; vy[i] -= dy / d * k;
+      }
+      vx[i] += -ox[i] * .02; vy[i] += -oy[i] * .02;
+      vx[i] *= .85; vy[i] *= .85; ox[i] += vx[i]; oy[i] += vy[i];
+      var c = PHRASE[i % L]; if (c === " ") continue;
+      var near = Math.max(0, 1 - Math.hypot(gx[i] + ox[i] - mx, gy[i] + oy[i] - my) / 360);
+      var h = Math.min(1, pull * near * 1.6 + Math.max(0, still - CALM) / 30 * .3);
+      x.fillStyle = "rgb(" + ((BASE[0] + (RED[0] - BASE[0]) * h) | 0) + "," + ((BASE[1] + (RED[1] - BASE[1]) * h) | 0) + "," + ((BASE[2] + (RED[2] - BASE[2]) * h) | 0) + ")";
+      if (h > .3) { var s = 1 + (h - .3) * .5; x.save(); x.translate(gx[i] + ox[i], gy[i] + oy[i]); x.scale(s, s); x.fillText(c, 0, 0); x.restore(); }
+      else x.fillText(c, gx[i] + ox[i], gy[i] + oy[i]);
+    }
+    if (mouse.on) { x.strokeStyle = "#8a929c"; x.lineWidth = 1; x.beginPath(); x.arc(mx, my, 4, 0, 7); x.stroke(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

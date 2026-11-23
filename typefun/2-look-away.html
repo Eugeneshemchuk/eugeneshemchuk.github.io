@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- 2 · Look away: the wall flees from wherever you look (cursor/touch), and slowly turns red while you wait. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Look Away</title>
+<style>
+  html,body{margin:0;height:100%;background:#2b313a;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;cursor:none;touch-action:none}
+  #clock{position:fixed;right:16px;bottom:12px;font:600 12px ui-monospace,Menlo,monospace;color:#8a929c;
+    background:#2b313acc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+</style></head><body><canvas id="c"></canvas><div id="clock"></div>
+<script>
+(function () {
+  var PHRASE = "START LEARNING THE FUCKING DUTCH!!! ";
+  var FONT_PX = 15, LINE = 1.55, RADIUS = 150, PUSH = 1.0;
+  var BASE = [205, 210, 216], RED = [255, 70, 55];
+  var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
+  var dpr, W, H, cw, ch, cols, rows, N, gx, gy, ox, oy, vx, vy, heat;
+  var mouse = { x: -1e4, y: -1e4, on: false };
+
+  function setup() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.font = "600 " + FONT_PX + "px ui-monospace, Menlo, monospace";
+    cw = x.measureText("M").width; ch = FONT_PX * LINE;
+    cols = Math.ceil(W / cw); rows = Math.ceil(H / ch) + 1; N = cols * rows;
+    gx = new Float32Array(N); gy = new Float32Array(N); ox = new Float32Array(N); oy = new Float32Array(N);
+    vx = new Float32Array(N); vy = new Float32Array(N); heat = heat && heat.length === N ? heat : new Float32Array(N);
+    for (var i = 0; i < N; i++) { gx[i] = (i % cols) * cw; gy[i] = Math.floor(i / cols) * ch + FONT_PX; }
+  }
+  addEventListener("resize", setup); setup();
+
+  function move(e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; }
+  addEventListener("pointermove", move); addEventListener("pointerdown", move);
+  document.addEventListener("pointerleave", function () { mouse.on = false; });
+  addEventListener("pointerup", function (e) { if (e.pointerType !== "mouse") mouse.on = false; });
+
+  // every few seconds one more phrase in the wall goes red: the guilt piles up
+  var t0 = performance.now(), nextHeat = 0;
+  function heatOne() {
+    var start = Math.floor(Math.random() * N / PHRASE.length) * PHRASE.length;
+    for (var k = 0; k < PHRASE.length - 1 && start + k < N; k++) heat[start + k] = Math.min(1, heat[start + k] + .5);
+  }
+
+  function frame(now) {
+    var sec = (now - t0) / 1000;
+    if (sec > nextHeat) { heatOne(); nextHeat = sec + Math.max(.4, 3.2 - sec / 60); }
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    clock.textContent = "postponed " + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+
+    x.fillStyle = "#2b313a"; x.fillRect(0, 0, W, H);
+    var R2 = RADIUS * RADIUS, mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4;
+    for (var i = 0; i < N; i++) {
+      var px = gx[i] + ox[i], py = gy[i] - FONT_PX * .35 + oy[i];
+      var dx = px - mx, dy = py - my, d2 = dx * dx + dy * dy;
+      if (d2 < R2) {
+        var d = Math.sqrt(d2) + .001, f = (1 - d / RADIUS); f = f * f * 9 * PUSH;
+        vx[i] += dx / d * f; vy[i] += dy / d * f;
+      }
+      vx[i] += -ox[i] * .015; vy[i] += -oy[i] * .015;   // slow spring back: it always returns
+      vx[i] *= .86; vy[i] *= .86; ox[i] += vx[i]; oy[i] += vy[i];
+      var c = PHRASE[i % PHRASE.length]; if (c === " ") continue;
+      var off = Math.min(1, Math.hypot(ox[i], oy[i]) / 90), h = heat[i];
+      var a = 1 - off * .85;
+      var r = BASE[0] + (RED[0] - BASE[0]) * h, g = BASE[1] + (RED[1] - BASE[1]) * h, b = BASE[2] + (RED[2] - BASE[2]) * h;
+      x.fillStyle = "rgba(" + (r | 0) + "," + (g | 0) + "," + (b | 0) + "," + a.toFixed(2) + ")";
+      x.fillText(c, gx[i] + ox[i], gy[i] + oy[i]);
+    }
+    // the cursor is a small empty ring: the place you are looking at, always clear
+    if (mouse.on) { x.strokeStyle = "#8a929c"; x.lineWidth = 1; x.beginPath(); x.arc(mouse.x, mouse.y, 4, 0, 7); x.stroke(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

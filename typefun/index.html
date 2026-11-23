@@ -1,0 +1,331 @@
+<!doctype html>
+<!-- Studio: all "look away" pieces in one page. Presets + live controls. Press H to hide the panel. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dutch Studio</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#2b313a}
+  canvas{display:block;width:100vw;height:100vh;cursor:none;touch-action:none}
+  #hud{position:fixed;right:16px;bottom:12px;font:600 12px ui-monospace,Menlo,monospace;color:#8a929c;
+    background:#0006;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+  #panel{position:fixed;top:12px;left:12px;width:min(260px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;
+    background:#14181dee;color:#cfd4da;font:12px/1.3 ui-monospace,Menlo,monospace;border:1px solid #3a424d;
+    border-radius:8px;padding:10px 12px;box-sizing:border-box;cursor:auto;backdrop-filter:blur(6px)}
+  #panel.hidden{display:none}
+  #panel h2{margin:12px 0 6px;font-size:10px;letter-spacing:.12em;color:#7d8691;text-transform:uppercase;font-weight:600}
+  #panel h2:first-child{margin-top:0}
+  .row{display:grid;grid-template-columns:86px 1fr 38px;align-items:center;gap:6px;margin:4px 0}
+  .row span.v{text-align:right;color:#8a929c}
+  .row.wide{grid-template-columns:86px 1fr}
+  input[type=range]{width:100%;accent-color:#ff8a3d}
+  input[type=text],select,textarea{width:100%;box-sizing:border-box;background:#0d1014;color:#e6e9ee;border:1px solid #3a424d;
+    border-radius:4px;padding:5px 6px;font:12px ui-monospace,Menlo,monospace}
+  textarea{resize:vertical;min-height:44px}
+  input[type=color]{width:100%;height:22px;border:1px solid #3a424d;background:none;padding:0;border-radius:4px}
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+  .presets button,.btns button{background:#0d1014;color:#cfd4da;border:1px solid #3a424d;border-radius:4px;padding:6px 4px;
+    font:12px ui-monospace,Menlo,monospace;cursor:pointer}
+  .presets button.on{border-color:#ff8a3d;color:#ff8a3d}
+  .btns{display:flex;gap:4px;margin-top:10px}.btns button{flex:1}
+  .hint{color:#6b737d;font-size:11px;margin-top:8px}
+  #show{position:fixed;top:12px;left:12px;display:none;background:#14181dcc;color:#cfd4da;border:1px solid #3a424d;
+    border-radius:6px;font:12px ui-monospace,Menlo,monospace;padding:6px 10px;cursor:pointer}
+</style></head><body>
+<canvas id="c"></canvas><div id="hud"></div>
+<button id="show">controls</button>
+<div id="panel">
+  <h2>Preset</h2>
+  <div class="presets" id="presets"></div>
+  <p class="hint" id="presetNote"></p>
+  <h2>Text</h2>
+  <textarea id="text" spellcheck="false"></textarea>
+  <div id="controls"></div>
+  <div class="btns"><button id="reset">reset preset</button><button id="shuffle">surprise me</button><button id="hide">hide (H)</button></div>
+  <p class="hint">Space = pause · S = save PNG</p>
+</div>
+<script>
+(function () {
+  // ---------- presets: each sets a mode plus its own defaults ----------
+  var COMMON = {
+    text: "FUCKING START LEARNING DUTCH ALREADY", font: "mono", size: 15, weight: 600, line: 1.55, spacing: 0,
+    upper: 1, bg: "#2b313a", ink: "#cdd2d8", guilt: "#ff4637", guiltRate: 1, jitter: 0, breathe: 0, wave: 0,
+    trail: 0, tilt: 0, counter: 1, ring: 1
+  };
+  var PRESETS = {
+    lookaway: { label: "Look away", note: "The wall flees from wherever you look.",
+      mode: "lookaway", radius: 150, strength: 1, spring: .015, damping: .86 },
+    swirl: { label: "Swirl", note: "Letters spin around you like a drain of distractions.",
+      mode: "swirl", radius: 190, strength: 1, spring: .008, damping: .9, tilt: 1 },
+    rubble: { label: "Rubble", note: "What you touch falls and piles up. The wall grows back.",
+      mode: "rubble", radius: 60, strength: 1, spring: .015, damping: .86, regrow: 6, pileMax: .5, gravity: .45 },
+    closing: { label: "Closing in", note: "Keep moving to look busy. Sit still and it closes in.",
+      mode: "closing", radius: 230, strength: 1, spring: .02, damping: .85, calm: 2.5 },
+    magnet: { label: "Magnet", note: "Mine. The wall is pulled toward you and you can't escape it.",
+      mode: "magnet", radius: 220, strength: .8, spring: .03, damping: .82 },
+    storm: { label: "Storm", note: "Look away, but everything shivers, breathes and drifts.",
+      mode: "lookaway", radius: 170, strength: 1.4, spring: .01, damping: .9, jitter: .5, wave: .6, breathe: .4, guiltRate: 2.2 }
+  };
+  var FONTS = {
+    mono: "ui-monospace, SFMono-Regular, Menlo, monospace", courier: "'Courier New', Courier, monospace",
+    helvetica: "'Helvetica Neue', Helvetica, Arial, sans-serif", impact: "Impact, 'Arial Black', sans-serif",
+    georgia: "Georgia, serif", times: "'Times New Roman', Times, serif", futura: "Futura, 'Avenir Next', sans-serif",
+    marker: "'Marker Felt', 'Comic Sans MS', cursive"
+  };
+  // ---------- control definitions ----------
+  var CONTROLS = [
+    ["h", "Type"],
+    ["select", "font", "font", Object.keys(FONTS)],
+    ["range", "size", "size", 6, 60, 1], ["range", "weight", "weight", 100, 900, 100],
+    ["range", "line", "line height", .8, 3, .05], ["range", "spacing", "spacing", -4, 20, .5],
+    ["check", "upper", "UPPERCASE"],
+    ["h", "Effect"],
+    ["range", "radius", "radius", 20, 500, 5], ["range", "strength", "strength", 0, 4, .05],
+    ["range", "spring", "return", 0, .08, .001], ["range", "damping", "damping", .6, .99, .01],
+    ["range", "tilt", "tilt", 0, 1, .05],
+    ["range", "regrow", "regrow s", 1, 30, .5, "rubble"], ["range", "gravity", "gravity", .05, 1.5, .05, "rubble"],
+    ["range", "pileMax", "pile max", .1, .9, .05, "rubble"], ["range", "calm", "calm s", .5, 10, .5, "closing"],
+    ["h", "Extras"],
+    ["range", "guiltRate", "guilt", 0, 4, .1], ["range", "jitter", "shiver", 0, 1, .02],
+    ["range", "wave", "drift wave", 0, 1, .02], ["range", "breathe", "breathe", 0, 1, .02],
+    ["range", "trail", "afterimage", 0, .95, .05],
+    ["h", "Colour"],
+    ["color", "bg", "background"], ["color", "ink", "ink"], ["color", "guilt", "guilt"],
+    ["check", "counter", "show counter"], ["check", "ring", "show cursor ring"]
+  ];
+
+  var S = {}, presetKey = "lookaway";
+  function loadPreset(k) {
+    presetKey = k;
+    var keep = S.text;                       // keep the user's own text across presets
+    S = Object.assign({ regrow: 6, pileMax: .5, gravity: .45, calm: 2.5 }, COMMON, PRESETS[k]);
+    if (keep) S.text = keep;
+    buildUI(); setup(); save();
+  }
+  function save() { try { localStorage.setItem("dutch-studio", JSON.stringify({ k: presetKey, s: S })); } catch (e) {} }
+
+  // ---------- UI ----------
+  var panel = document.getElementById("panel"), ctl = document.getElementById("controls");
+  var presetsEl = document.getElementById("presets"), noteEl = document.getElementById("presetNote");
+  var textEl = document.getElementById("text");
+  Object.keys(PRESETS).forEach(function (k) {
+    var b = document.createElement("button"); b.textContent = PRESETS[k].label; b.dataset.k = k;
+    b.onclick = function () { loadPreset(k); }; presetsEl.appendChild(b);
+  });
+  textEl.oninput = function () { S.text = textEl.value; setup(); save(); };
+  function buildUI() {
+    [].forEach.call(presetsEl.children, function (b) { b.classList.toggle("on", b.dataset.k === presetKey); });
+    noteEl.textContent = PRESETS[presetKey].note; textEl.value = S.text; ctl.innerHTML = "";
+    CONTROLS.forEach(function (c) {
+      if (c[0] === "h") { var h = document.createElement("h2"); h.textContent = c[1]; ctl.appendChild(h); return; }
+      var only = c[0] === "range" ? c[6] : null;
+      if (only && only !== S.mode) return;
+      var row = document.createElement("label"); row.className = "row" + (c[0] === "range" ? "" : " wide");
+      row.innerHTML = "<span>" + c[2] + "</span>"; var input, val;
+      if (c[0] === "range") {
+        input = document.createElement("input"); input.type = "range"; input.min = c[3]; input.max = c[4]; input.step = c[5];
+        input.value = S[c[1]]; val = document.createElement("span"); val.className = "v";
+        var fmt = function () { val.textContent = (+input.value).toFixed(c[5] < .01 ? 3 : c[5] < 1 ? 2 : 0); }; fmt();
+        input.oninput = function () { S[c[1]] = +input.value; fmt(); if (/size|weight|line|spacing/.test(c[1])) setup(); save(); };
+      } else if (c[0] === "select") {
+        input = document.createElement("select");
+        c[3].forEach(function (o) { var op = document.createElement("option"); op.value = op.textContent = o; input.appendChild(op); });
+        input.value = S[c[1]]; input.onchange = function () { S[c[1]] = input.value; setup(); save(); };
+      } else if (c[0] === "color") {
+        input = document.createElement("input"); input.type = "color"; input.value = S[c[1]];
+        input.oninput = function () { S[c[1]] = input.value; document.body.style.background = S.bg; save(); };
+      } else {
+        input = document.createElement("input"); input.type = "checkbox"; input.checked = !!S[c[1]];
+        input.onchange = function () { S[c[1]] = input.checked ? 1 : 0; setup(); save(); };
+      }
+      row.appendChild(input); if (val) row.appendChild(val); ctl.appendChild(row);
+    });
+    document.body.style.background = S.bg;
+  }
+  var showBtn = document.getElementById("show");
+  function togglePanel(force) {
+    var hide = force !== undefined ? force : !panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", hide); showBtn.style.display = hide ? "block" : "none";
+  }
+  document.getElementById("hide").onclick = function () { togglePanel(true); };
+  showBtn.onclick = function () { togglePanel(false); };
+  document.getElementById("reset").onclick = function () { var t = S.text; S = {}; loadPreset(presetKey); S.text = t; textEl.value = t; setup(); };
+  document.getElementById("shuffle").onclick = function () {
+    function r(a, b) { return a + Math.random() * (b - a); }
+    var keys = Object.keys(PRESETS); loadPreset(keys[Math.floor(Math.random() * keys.length)]);
+    var fk = Object.keys(FONTS); S.font = fk[Math.floor(Math.random() * fk.length)];
+    S.size = Math.round(r(10, 34)); S.weight = [300, 400, 600, 800, 900][Math.floor(r(0, 5))]; S.line = +r(1.1, 2).toFixed(2);
+    S.radius = Math.round(r(80, 320)); S.strength = +r(.5, 2.5).toFixed(2); S.jitter = +r(0, .5).toFixed(2);
+    S.wave = +r(0, .7).toFixed(2); S.breathe = +r(0, .6).toFixed(2); S.trail = +r(0, .8).toFixed(2); S.tilt = +r(0, 1).toFixed(2);
+    var hue = Math.floor(r(0, 360));
+    S.bg = hsl(hue, 18, 14); S.ink = hsl(hue, 10, 84); S.guilt = hsl((hue + 180 + r(-40, 40)) % 360, 90, 60);
+    buildUI(); setup(); save();
+  };
+  function hsl(h, s, l) {
+    s /= 100; l /= 100; var k = function (n) { return (n + h / 30) % 12; }, a = s * Math.min(l, 1 - l);
+    var f = function (n) { return Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))).toString(16).padStart(2, "0"); };
+    return "#" + f(0) + f(8) + f(4);
+  }
+  var paused = false;
+  addEventListener("keydown", function (e) {
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.key === "h" || e.key === "H") togglePanel();
+    if (e.key === " ") { paused = !paused; e.preventDefault(); }
+    if (e.key === "s" || e.key === "S") { var a = document.createElement("a"); a.download = "dutch.png"; a.href = cv.toDataURL("image/png"); a.click(); }
+  });
+
+  // ---------- engine ----------
+  var cv = document.getElementById("c"), x = cv.getContext("2d"), hud = document.getElementById("hud");
+  var dpr, W, H, cw, ch, cols, rows, N, P, gx, gy, ox, oy, vx, vy, heat, state, born, fx, fy, fvx, fvy, fr, fvr, pile, heights, fontStr;
+  var mouse = { x: -1e4, y: -1e4, on: false }, t0 = performance.now(), prev = t0, sec = 0, nextHeat = 0;
+  var busy = 0, still = 0, lastX = 0, lastY = 0, fallen = 0;
+
+  function setup() {
+    if (!S.text) return;
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fontStr = S.weight + " " + S.size + "px " + FONTS[S.font]; x.font = fontStr;
+    var t = (S.upper ? S.text.toUpperCase() : S.text).replace(/\s+/g, " ").trim();
+    P = (t || " ") + " ";
+    cw = x.measureText("M").width + S.spacing; cw = Math.max(cw, 2); ch = S.size * S.line;
+    cols = Math.ceil(W / cw); rows = Math.ceil(H / ch) + 1;
+    // lay letters out by their real widths (proportional fonts), wrapping like a text stream
+    var adv = {}, px = [], py = [], cx = 0, cy = S.size, k = 0;
+    while (cy < H + ch) {
+      var chr = P[k % P.length];
+      if (adv[chr] === undefined) adv[chr] = Math.max(1, x.measureText(chr).width + S.spacing);
+      if (cx + adv[chr] > W && cx > 0) { cx = 0; cy += ch; if (cy >= H + ch) break; }
+      px.push(cx); py.push(cy); cx += adv[chr]; k++;
+    }
+    N = px.length;
+    gx = new Float32Array(N); gy = new Float32Array(N); ox = new Float32Array(N); oy = new Float32Array(N);
+    vx = new Float32Array(N); vy = new Float32Array(N); heat = new Float32Array(N); state = new Uint8Array(N);
+    born = new Float32Array(N).fill(-99); fx = new Float32Array(N); fy = new Float32Array(N); fvx = new Float32Array(N);
+    fvy = new Float32Array(N); fr = new Float32Array(N); fvr = new Float32Array(N); pile = []; heights = new Float32Array(cols + 1);
+    fallen = 0; still = 0; busy = 0;
+    for (var i = 0; i < N; i++) { gx[i] = px[i]; gy[i] = py[i]; }
+  }
+  addEventListener("resize", setup);
+  function move(e) { if (e.target !== cv) return; mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; }
+  addEventListener("pointermove", move); addEventListener("pointerdown", move);
+  document.addEventListener("pointerleave", function () { mouse.on = false; });
+  addEventListener("pointerup", function (e) { if (e.pointerType !== "mouse") mouse.on = false; });
+
+  function rgb(h) { h = h.slice(1); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
+  function heatOne() {
+    var L = P.length, s = Math.floor(Math.random() * N / L) * L;
+    for (var k = 0; k < L - 1 && s + k < N; k++) heat[s + k] = Math.min(1, heat[s + k] + .5);
+  }
+  function clock(s) { return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(Math.floor(s % 60)).padStart(2, "0"); }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(.05, (now - prev) / 1000); prev = now;
+    if (paused || !N) return;
+    sec += dt;
+    var mode = S.mode, L = P.length;
+    if (S.guiltRate > 0 && sec > nextHeat) { heatOne(); nextHeat = sec + Math.max(.3, 3.2 - sec / 60) / S.guiltRate; }
+
+    // closing-in: movement buys space, stillness eats it
+    var sp = Math.hypot(mouse.x - lastX, mouse.y - lastY); lastX = mouse.x; lastY = mouse.y;
+    var R = S.radius, pull = 0;
+    if (mode === "closing") {
+      busy = Math.min(1, busy + sp * .004);
+      if (sp < 1) still += dt; else still = Math.max(0, still - dt * 4);
+      if (still > S.calm) busy = Math.max(0, busy - dt * .35);
+      R = S.radius * busy; pull = Math.max(0, Math.min(1, (still - S.calm - 2) / 6));
+    }
+
+    var BG = rgb(S.bg), INK = rgb(S.ink), GU = rgb(S.guilt);
+    if (S.trail > 0) { x.globalAlpha = 1 - S.trail; }
+    x.fillStyle = S.bg; x.fillRect(0, 0, W, H); x.globalAlpha = 1;
+    x.font = fontStr; x.textBaseline = "alphabetic";
+    if (S.counter) {
+      hud.style.display = "block";
+      hud.textContent = mode === "rubble" ? fallen + " letters dropped · still not learning"
+        : mode === "closing" ? (still > S.calm ? "sitting still " + still.toFixed(1) + "s" : "keeping busy")
+        : mode === "magnet" ? "can't look away " + clock(sec) : "postponed " + clock(sec);
+    } else hud.style.display = "none";
+
+    if (mode === "rubble") {
+      x.fillStyle = S.guilt;
+      for (var p = 0; p < pile.length; p++) { var r = pile[p]; x.save(); x.translate(r[0], r[1]); x.rotate(r[3]); x.fillText(r[2], 0, 0); x.restore(); }
+    }
+    var mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4, R2 = R * R, k8 = S.strength;
+    var breathe = 1 + Math.sin(sec * 1.3) * .12 * S.breathe;
+
+    for (var i = 0; i < N; i++) {
+      var c = P[i % L];
+      // drift wave: the whole wall sways
+      var wx = S.wave ? Math.sin(gy[i] * .02 + sec * 1.1) * 10 * S.wave : 0;
+      var wy = S.wave ? Math.cos(gx[i] * .015 + sec * .8) * 6 * S.wave : 0;
+      var hx = gx[i] + wx, hy = gy[i] + wy;
+
+      if (mode === "rubble") {
+        if (state[i] === 0) {
+          var ddx = hx + cw / 2 - mx, ddy = hy - S.size * .35 - my;
+          if (c !== " " && ddx * ddx + ddy * ddy < R2) {
+            state[i] = 1; fx[i] = hx; fy[i] = hy; var dd = Math.sqrt(ddx * ddx + ddy * ddy) + .01;
+            fvx[i] = (ddx / dd * 3 + (Math.random() - .5) * 2) * k8; fvy[i] = (ddy / dd * 2 - 2) * k8; fr[i] = 0; fvr[i] = (Math.random() - .5) * .3;
+            continue;
+          }
+          if (c === " ") continue;
+          var a = Math.min(1, (sec - born[i]) / 1.5);
+          draw(c, hx, hy, 0, heat[i], a, 1, INK, GU);
+        } else if (state[i] === 1) {
+          fvy[i] += S.gravity; fx[i] += fvx[i]; fy[i] += fvy[i]; fr[i] += fvr[i]; fvx[i] *= .99;
+          if (fx[i] < 0) { fx[i] = 0; fvx[i] *= -.5; } if (fx[i] > W - cw) { fx[i] = W - cw; fvx[i] *= -.5; }
+          var col = Math.max(0, Math.min(cols, Math.round(fx[i] / cw))), floor = H - heights[col];
+          if (fy[i] >= floor) {
+            if (heights[col] < H * S.pileMax) { pile.push([fx[i], floor, c, fr[i] % .6]); heights[col] += S.size * .55; }
+            state[i] = 2; born[i] = sec; fallen++;
+          } else draw(c, fx[i], fy[i], fr[i], .6, 1, 1, INK, GU);
+        } else if (sec - born[i] > S.regrow) { state[i] = 0; born[i] = sec; }
+        continue;
+      }
+
+      var px = hx + ox[i], py = hy - S.size * .35 + oy[i];
+      var dx = px - mx, dy = py - my, d2 = dx * dx + dy * dy, d = Math.sqrt(d2) + .001;
+      var RR = R * breathe;
+      if (d < RR) {
+        var f = 1 - d / RR; f = f * f;
+        if (mode === "swirl") { vx[i] += (-dy / d * 3.2 + dx / d * 1.4) * f * 3 * k8; vy[i] += (dx / d * 3.2 + dy / d * 1.4) * f * 3 * k8; }
+        else if (mode === "magnet") { vx[i] -= dx / d * f * 4 * k8; vy[i] -= dy / d * f * 4 * k8; }
+        else { vx[i] += dx / d * f * (mode === "closing" ? 7 : 9) * k8; vy[i] += dy / d * f * (mode === "closing" ? 7 : 9) * k8; }
+      }
+      if (pull > 0) {
+        var hd = Math.hypot(hx - mx, hy - my);
+        if (hd < 320) { var kk = pull * (1 - hd / 320) * .9 * k8; vx[i] -= dx / d * kk; vy[i] -= dy / d * kk; }
+      }
+      if (S.jitter) { var jj = S.jitter * (.3 + heat[i]) * 1.2; vx[i] += (Math.random() - .5) * jj; vy[i] += (Math.random() - .5) * jj; }
+      vx[i] += -ox[i] * S.spring; vy[i] += -oy[i] * S.spring;
+      vx[i] *= S.damping; vy[i] *= S.damping; ox[i] += vx[i]; oy[i] += vy[i];
+      if (c === " ") continue;
+
+      var off = Math.min(1, Math.hypot(ox[i], oy[i]) / (mode === "swirl" ? 140 : 90));
+      var h = heat[i], alpha = 1, scale = 1;
+      if (mode === "lookaway" || mode === "swirl") alpha = 1 - off * (mode === "swirl" ? .75 : .85);
+      if (mode === "magnet") { alpha = 1; h = Math.max(h, off * .9); scale = 1 + off * .6; }
+      if (mode === "closing") {
+        var near = Math.max(0, 1 - Math.hypot(hx + ox[i] - mx, hy + oy[i] - my) / 360);
+        h = Math.max(h, Math.min(1, pull * near * 1.6 + Math.max(0, still - S.calm) / 30 * .3));
+        if (h > .3) scale = 1 + (h - .3) * .5;
+      }
+      var rot = S.tilt && off > .05 ? Math.atan2(vy[i], vx[i]) * off * S.tilt : 0;
+      draw(c, hx + ox[i], hy + oy[i], rot, h, alpha, scale, INK, GU);
+    }
+    if (mouse.on && S.ring) { x.strokeStyle = S.ink; x.globalAlpha = .6; x.lineWidth = 1; x.beginPath(); x.arc(mouse.x, mouse.y, 4, 0, 7); x.stroke(); x.globalAlpha = 1; }
+  }
+  function draw(c, X, Y, rot, h, a, s, INK, GU) {
+    x.fillStyle = "rgba(" + ((INK[0] + (GU[0] - INK[0]) * h) | 0) + "," + ((INK[1] + (GU[1] - INK[1]) * h) | 0) + "," +
+      ((INK[2] + (GU[2] - INK[2]) * h) | 0) + "," + a.toFixed(2) + ")";
+    if (rot || s !== 1) { x.save(); x.translate(X, Y); if (rot) x.rotate(rot); if (s !== 1) x.scale(s, s); x.fillText(c, 0, 0); x.restore(); }
+    else x.fillText(c, X, Y);
+  }
+
+  // ---------- start: restore last session if there is one ----------
+  var saved = null; try { saved = JSON.parse(localStorage.getItem("dutch-studio")); } catch (e) {}
+  if (saved && PRESETS[saved.k]) { presetKey = saved.k; S = Object.assign({}, COMMON, PRESETS[saved.k], saved.s); buildUI(); setup(); }
+  else loadPreset("lookaway");
+  if (innerWidth < 700) togglePanel(true);   // phones: start with the panel closed
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

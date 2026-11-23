@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- 2a · Swirl: letters near the cursor spin around it like a drain of distractions, then drift back. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Swirl</title>
+<style>
+  html,body{margin:0;height:100%;background:#2b313a;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;cursor:none;touch-action:none}
+  #clock{position:fixed;right:16px;bottom:12px;font:600 12px ui-monospace,Menlo,monospace;color:#8a929c;
+    background:#2b313acc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+</style></head><body><canvas id="c"></canvas><div id="clock"></div>
+<script>
+(function () {
+  var PHRASE = "FUCKING START LEARNING DUTCH ALREADY ";
+  var FONT_PX = 15, LINE = 1.55, RADIUS = 190;
+  var BASE = [205, 210, 216], RED = [255, 70, 55];
+  var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
+  var dpr, W, H, cw, ch, cols, rows, N, gx, gy, ox, oy, vx, vy, heat;
+  var mouse = { x: -1e4, y: -1e4, on: false };
+
+  function setup() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.font = "600 " + FONT_PX + "px ui-monospace, Menlo, monospace";
+    cw = x.measureText("M").width; ch = FONT_PX * LINE;
+    cols = Math.ceil(W / cw); rows = Math.ceil(H / ch) + 1; N = cols * rows;
+    gx = new Float32Array(N); gy = new Float32Array(N); ox = new Float32Array(N); oy = new Float32Array(N);
+    vx = new Float32Array(N); vy = new Float32Array(N); heat = new Float32Array(N);
+    for (var i = 0; i < N; i++) { gx[i] = (i % cols) * cw; gy[i] = Math.floor(i / cols) * ch + FONT_PX; }
+  }
+  addEventListener("resize", setup); setup();
+  function move(e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; }
+  addEventListener("pointermove", move); addEventListener("pointerdown", move);
+  document.addEventListener("pointerleave", function () { mouse.on = false; });
+  addEventListener("pointerup", function (e) { if (e.pointerType !== "mouse") mouse.on = false; });
+
+  var t0 = performance.now(), nextHeat = 0, L = PHRASE.length;
+  function heatOne() {
+    var s = Math.floor(Math.random() * N / L) * L;
+    for (var k = 0; k < L - 1 && s + k < N; k++) heat[s + k] = Math.min(1, heat[s + k] + .5);
+  }
+  function frame(now) {
+    var sec = (now - t0) / 1000;
+    if (sec > nextHeat) { heatOne(); nextHeat = sec + Math.max(.4, 3.2 - sec / 60); }
+    clock.textContent = "postponed " + String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(Math.floor(sec % 60)).padStart(2, "0");
+    x.fillStyle = "#2b313a"; x.fillRect(0, 0, W, H);
+    var R2 = RADIUS * RADIUS, mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4;
+    for (var i = 0; i < N; i++) {
+      var px = gx[i] + ox[i], py = gy[i] - FONT_PX * .35 + oy[i];
+      var dx = px - mx, dy = py - my, d2 = dx * dx + dy * dy;
+      if (d2 < R2) {
+        var d = Math.sqrt(d2) + .001, f = 1 - d / RADIUS;
+        // tangential spin plus a little outward push keeps a calm eye in the middle
+        vx[i] += (-dy / d * 3.2 + dx / d * 1.4) * f * f * 3;
+        vy[i] += ( dx / d * 3.2 + dy / d * 1.4) * f * f * 3;
+      }
+      vx[i] += -ox[i] * .008; vy[i] += -oy[i] * .008;
+      vx[i] *= .9; vy[i] *= .9; ox[i] += vx[i]; oy[i] += vy[i];
+      var c = PHRASE[i % L]; if (c === " ") continue;
+      var off = Math.min(1, Math.hypot(ox[i], oy[i]) / 140), h = heat[i], a = 1 - off * .75;
+      x.fillStyle = "rgba(" + ((BASE[0] + (RED[0] - BASE[0]) * h) | 0) + "," + ((BASE[1] + (RED[1] - BASE[1]) * h) | 0) + "," +
+        ((BASE[2] + (RED[2] - BASE[2]) * h) | 0) + "," + a.toFixed(2) + ")";
+      if (off > .05) {             // letters in the swirl tilt along their path
+        x.save(); x.translate(px, py + FONT_PX * .35); x.rotate(Math.atan2(vy[i], vx[i]) * off);
+        x.fillText(c, 0, 0); x.restore();
+      } else x.fillText(c, px, gy[i] + oy[i]);
+    }
+    if (mouse.on) { x.strokeStyle = "#8a929c"; x.lineWidth = 1; x.beginPath(); x.arc(mouse.x, mouse.y, 4, 0, 7); x.stroke(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

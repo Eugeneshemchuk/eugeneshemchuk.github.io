@@ -1,0 +1,154 @@
+<!doctype html>
+<!-- 1 · Fog: the wall of text under drifting hash-cloud fog (port of Portfolio js/hash.js). Hover/smoke/click turn it Dutch. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dutch Fog</title>
+<style>
+  html,body{margin:0;height:100%;background:#20252c;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;cursor:crosshair}
+</style></head><body><canvas id="c"></canvas>
+<script>
+(function () {
+  var EN = "START LEARNING THE FUCKING DUTCH!!! ";
+  var NL = "LEER VERDOMME NEDERLANDS!!! ";
+  var CONFIG = {
+    fontCssPx: 15, lineHeight: 1.45, cloudScale: 1.5, windSpeed: 1.0, smokeSpeed: 1.0,
+    hoverRadius: 0.11, trailLife: 2.6, waveSpeed: 0.32, waveWidth: 0.12, waveLife: 4.0, maxDPR: 2,
+    bg: "#20252c", ink: "#3a424d", hi: "#e6e9ee", glow: "#ff8a3d"
+  };
+  var MAX_TAPS = 8, MAX_TRAIL = 48;
+  var CHARS = Array.from(new Set((EN + NL).split(""))).join("");
+  function idx(s) { return s.split("").map(function (ch) { return CHARS.indexOf(ch); }); }
+  var enIdx = idx(EN), nlIdx = idx(NL);
+
+  var canvas = document.getElementById("c");
+  var gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: true, alpha: true });
+  if (!gl) { document.body.innerHTML = "<p style='color:#ccc;font:16px monospace;padding:2em'>Needs WebGL2.</p>"; return; }
+
+  var VS = "#version 300 es\nconst vec2 P[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));void main(){gl_Position=vec4(P[gl_VertexID],0.,1.);}";
+  var FS = `#version 300 es
+  precision highp float;
+  uniform vec2 uRes, uCell, uAtlasGrid, uMouse;
+  uniform float uTime, uSeed, uCloudScale, uWind, uSmokeSpeed, uCols;
+  uniform float uHoverAmt, uHoverRadius, uTrailLife, uWaveSpeed, uWaveWidth, uWaveLife;
+  uniform vec3 uBg, uInk, uHi, uGlow;
+  uniform sampler2D uAtlas;
+  uniform float uEN[${EN.length}];
+  uniform float uNL[${NL.length}];
+  uniform vec4 uTaps[${MAX_TAPS}]; uniform int uTapCount;
+  uniform vec4 uTrail[${MAX_TRAIL}]; uniform int uTrailCount;
+  out vec4 outColor;
+  float hash(vec2 p){p=fract(p*vec2(123.34,456.21)+uSeed);p+=dot(p,p+45.32);return fract(p.x*p.y);}
+  float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);
+    return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
+  float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*vnoise(p);p=p*2.03+vec2(17.1,9.2);a*=.5;}return s;}
+  float fbm3(vec2 p){float s=0.,a=.5;for(int i=0;i<3;i++){s+=a*vnoise(p);p=p*2.03+vec2(17.1,9.2);a*=.5;}return s/.875;}
+  void main(){
+    vec2 frag=vec2(gl_FragCoord.x,uRes.y-gl_FragCoord.y);
+    vec2 cell=floor(frag/uCell), local=fract(frag/uCell);
+    vec2 center=(cell+.5)*uCell, uv=center/uRes.y;
+    float t=uTime;
+    vec2 q=uv*uCloudScale, wind=vec2(.035,-.015)*t*uWind;
+    vec2 w=vec2(fbm(q+wind),fbm(q+vec2(5.2,1.3)-wind*.7));
+    float n=fbm(q*1.3+w*1.4+wind*1.5);
+    float base=smoothstep(.30,.78,n);
+    vec2 sq=uv*.9+vec2(.06,.02)*t*uSmokeSpeed;
+    float smoke=smoothstep(.58,.86,fbm3(sq*1.7+vec2(fbm3(sq+3.1),fbm3(sq+7.7))*1.2));
+    float r2=uHoverRadius*uHoverRadius; vec2 dm=(center-uMouse)/uRes.y;
+    float hover=uHoverAmt*exp(-dot(dm,dm)/r2);
+    for(int i=0;i<${MAX_TRAIL};i++){ if(i>=uTrailCount)break; vec4 s=uTrail[i]; float age=t-s.z;
+      if(age<0.||age>uTrailLife)continue; vec2 d=(center-s.xy)/uRes.y; float life=1.-age/uTrailLife;
+      hover=max(hover,exp(-dot(d,d)/(r2*(1.+age*.6)))*life*life*.85);}
+    float wave=0.;
+    for(int i=0;i<${MAX_TAPS};i++){ if(i>=uTapCount)break; vec4 tp=uTaps[i]; float age=t-tp.z;
+      if(age<0.||age>uWaveLife)continue; float R=age*uWaveSpeed+.02;
+      float d=length((center-tp.xy)/uRes.y)-R;
+      float band=smoothstep(-uWaveWidth,-uWaveWidth*.2,d)*(1.-smoothstep(-.004,.006,d));
+      wave=max(wave,band*(1.-smoothstep(uWaveLife*.4,uWaveLife,age)));}
+    // the wall is always faintly there; fog lifts it, focus turns it Dutch
+    float dutch=clamp(max(hover,wave)*1.4+smoke*.5,0.,1.);
+    float vis=clamp(.16+base*.5+smoke*.35+hover+wave,0.,1.);
+    float i=cell.y*uCols+cell.x;
+    float ge=uEN[int(mod(i,${EN.length}.))], gn=uNL[int(mod(i,${NL.length}.))];
+    float g=dutch>.5?gn:ge;
+    vec2 ag=vec2(mod(g,uAtlasGrid.x),floor(g/uAtlasGrid.x));
+    float ink=texture(uAtlas,(ag+local)/uAtlasGrid).a;
+    vec3 col=mix(uInk,uHi,smoothstep(.3,1.,vis));
+    col=mix(col,uGlow,smoothstep(.45,.9,dutch));
+    outColor=vec4(mix(uBg,col,ink*vis),1.);
+  }`;
+  function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  var prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog); gl.useProgram(prog); gl.bindVertexArray(gl.createVertexArray());
+  var U = {};
+  ["uRes","uCell","uAtlasGrid","uMouse","uTime","uSeed","uCloudScale","uWind","uSmokeSpeed","uCols","uHoverAmt",
+   "uHoverRadius","uTrailLife","uWaveSpeed","uWaveWidth","uWaveLife","uBg","uInk","uHi","uGlow","uAtlas","uEN","uNL",
+   "uTaps","uTapCount","uTrail","uTrailCount"].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+
+  var tex = gl.createTexture(), cellW = 0, cellH = 0, aCols = 16, aRows = 1;
+  function buildAtlas(dpr) {
+    var px = Math.round(CONFIG.fontCssPx * dpr), font = "600 " + px + "px ui-monospace, Menlo, monospace";
+    var c = document.createElement("canvas"), x = c.getContext("2d");
+    x.font = font; cellW = Math.ceil(x.measureText("M").width); cellH = Math.ceil(px * CONFIG.lineHeight);
+    aRows = Math.ceil(CHARS.length / aCols); c.width = cellW * aCols; c.height = cellH * aRows;
+    x.font = font; x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "middle";
+    CHARS.split("").forEach(function (ch, i) { x.fillText(ch, (i % aCols + .5) * cellW, (Math.floor(i / aCols) + .5) * cellH); });
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach(function (p) { gl.texParameteri(gl.TEXTURE_2D, p, gl.NEAREST); });
+    [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(function (p) { gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE); });
+  }
+  function rgb(h) { h = h.slice(1); return [0, 2, 4].map(function (i) { return parseInt(h.substr(i, 2), 16) / 255; }); }
+
+  var dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, CONFIG.maxDPR);
+    canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr);
+    buildAtlas(dpr); gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  addEventListener("resize", resize); resize();
+
+  var t0 = performance.now(), seed = Math.random();
+  function now() { return (performance.now() - t0) / 1000; }
+  var target = [0, 0], mouse = [0, 0], inside = false, hoverAmt = 0;
+  var trail = new Float32Array(MAX_TRAIL * 4), tI = 0, tC = 0, last = [-1e9, -1e9, -1e9];
+  var taps = new Float32Array(MAX_TAPS * 4), pI = 0, pC = 0;
+  addEventListener("pointermove", function (e) {
+    target = [e.clientX * dpr, e.clientY * dpr];
+    if (!inside && hoverAmt < .02) mouse = target.slice();
+    inside = true;
+  });
+  document.addEventListener("pointerleave", function () { inside = false; });
+  addEventListener("pointerdown", function (e) {
+    var k = pI * 4; taps[k] = e.clientX * dpr; taps[k + 1] = e.clientY * dpr; taps[k + 2] = now();
+    pI = (pI + 1) % MAX_TAPS; pC = Math.min(pC + 1, MAX_TAPS);
+  });
+
+  function frame() {
+    var t = now();
+    mouse[0] += (target[0] - mouse[0]) * .2; mouse[1] += (target[1] - mouse[1]) * .2;
+    hoverAmt += ((inside ? 1 : 0) - hoverAmt) * .06;
+    if (inside) {
+      var sp = CONFIG.hoverRadius * canvas.height * .25, dx = mouse[0] - last[0], dy = mouse[1] - last[1];
+      if (dx * dx + dy * dy > sp * sp || t - last[2] > .25) {
+        var k = tI * 4; trail[k] = mouse[0]; trail[k + 1] = mouse[1]; trail[k + 2] = t;
+        tI = (tI + 1) % MAX_TRAIL; tC = Math.min(tC + 1, MAX_TRAIL); last = [mouse[0], mouse[1], t];
+      }
+    }
+    gl.uniform2f(U.uRes, canvas.width, canvas.height); gl.uniform2f(U.uCell, cellW, cellH);
+    gl.uniform2f(U.uAtlasGrid, aCols, aRows); gl.uniform2f(U.uMouse, mouse[0], mouse[1]);
+    gl.uniform1f(U.uTime, t); gl.uniform1f(U.uSeed, seed); gl.uniform1f(U.uCols, Math.floor(canvas.width / cellW) + 1);
+    gl.uniform1f(U.uCloudScale, CONFIG.cloudScale); gl.uniform1f(U.uWind, CONFIG.windSpeed); gl.uniform1f(U.uSmokeSpeed, CONFIG.smokeSpeed);
+    gl.uniform1f(U.uHoverAmt, hoverAmt); gl.uniform1f(U.uHoverRadius, CONFIG.hoverRadius); gl.uniform1f(U.uTrailLife, CONFIG.trailLife);
+    gl.uniform1f(U.uWaveSpeed, CONFIG.waveSpeed); gl.uniform1f(U.uWaveWidth, CONFIG.waveWidth); gl.uniform1f(U.uWaveLife, CONFIG.waveLife);
+    gl.uniform3fv(U.uBg, rgb(CONFIG.bg)); gl.uniform3fv(U.uInk, rgb(CONFIG.ink)); gl.uniform3fv(U.uHi, rgb(CONFIG.hi)); gl.uniform3fv(U.uGlow, rgb(CONFIG.glow));
+    gl.uniform1fv(U.uEN, enIdx); gl.uniform1fv(U.uNL, nlIdx);
+    gl.uniform4fv(U.uTaps, taps); gl.uniform1i(U.uTapCount, pC); gl.uniform4fv(U.uTrail, trail); gl.uniform1i(U.uTrailCount, tC);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(U.uAtlas, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

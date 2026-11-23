@@ -1,0 +1,81 @@
+<!doctype html>
+<!-- 2b · Rubble: letters you touch fall and pile up at the bottom; the wall quietly grows back. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rubble</title>
+<style>
+  html,body{margin:0;height:100%;background:#2b313a;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;cursor:none;touch-action:none}
+  #clock{position:fixed;right:16px;top:12px;font:600 12px ui-monospace,Menlo,monospace;color:#8a929c;
+    background:#2b313acc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+</style></head><body><canvas id="c"></canvas><div id="clock"></div>
+<script>
+(function () {
+  var PHRASE = "FUCKING START LEARNING DUTCH ALREADY ";
+  var FONT_PX = 15, LINE = 1.55, RADIUS = 60, REGROW = 6, PILE_MAX = .5;
+  var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
+  var dpr, W, H, cw, ch, cols, rows, N, gx, gy, state, born, fx, fy, fvx, fvy, fr, fvr, pile, heights;
+  var mouse = { x: -1e4, y: -1e4, on: false }, L = PHRASE.length, fallen = 0;
+
+  function setup() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.font = "600 " + FONT_PX + "px ui-monospace, Menlo, monospace";
+    cw = x.measureText("M").width; ch = FONT_PX * LINE;
+    cols = Math.ceil(W / cw); rows = Math.ceil(H / ch) + 1; N = cols * rows;
+    gx = new Float32Array(N); gy = new Float32Array(N); state = new Uint8Array(N); born = new Float32Array(N);
+    fx = new Float32Array(N); fy = new Float32Array(N); fvx = new Float32Array(N); fvy = new Float32Array(N);
+    fr = new Float32Array(N); fvr = new Float32Array(N);
+    pile = []; heights = new Float32Array(cols + 1);
+    for (var i = 0; i < N; i++) { gx[i] = (i % cols) * cw; gy[i] = Math.floor(i / cols) * ch + FONT_PX; born[i] = -99; }
+  }
+  addEventListener("resize", setup); setup();
+  function move(e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; }
+  addEventListener("pointermove", move); addEventListener("pointerdown", move);
+  document.addEventListener("pointerleave", function () { mouse.on = false; });
+  addEventListener("pointerup", function (e) { if (e.pointerType !== "mouse") mouse.on = false; });
+
+  var t0 = performance.now();
+  function frame(now) {
+    var sec = (now - t0) / 1000;
+    clock.textContent = fallen + " letters dropped · still not learning";
+    x.fillStyle = "#2b313a"; x.fillRect(0, 0, W, H);
+    var R2 = RADIUS * RADIUS, mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4;
+
+    // rubble on the floor (drawn first, under the wall)
+    x.fillStyle = "rgb(255,95,70)";
+    for (var p = 0; p < pile.length; p++) {
+      var r = pile[p]; x.save(); x.translate(r[0], r[1]); x.rotate(r[3]); x.fillText(r[2], 0, 0); x.restore();
+    }
+
+    for (var i = 0; i < N; i++) {
+      var c = PHRASE[i % L];
+      if (state[i] === 0) {
+        var dx = gx[i] + cw / 2 - mx, dy = gy[i] - FONT_PX * .35 - my;
+        if (c !== " " && dx * dx + dy * dy < R2) {          // knocked loose
+          state[i] = 1; fx[i] = gx[i]; fy[i] = gy[i];
+          var d = Math.sqrt(dx * dx + dy * dy) + .01;
+          fvx[i] = dx / d * 3 + (Math.random() - .5) * 2; fvy[i] = dy / d * 2 - 2; fr[i] = 0; fvr[i] = (Math.random() - .5) * .3;
+        } else if (c !== " ") {
+          var a = Math.min(1, (sec - born[i]) / 1.5);        // regrown letters fade back in
+          x.fillStyle = "rgba(205,210,216," + a.toFixed(2) + ")"; x.fillText(c, gx[i], gy[i]);
+        }
+      } else if (state[i] === 1) {
+        fvy[i] += .45; fx[i] += fvx[i]; fy[i] += fvy[i]; fr[i] += fvr[i]; fvx[i] *= .99;
+        if (fx[i] < 0) { fx[i] = 0; fvx[i] *= -.5; } if (fx[i] > W - cw) { fx[i] = W - cw; fvx[i] *= -.5; }
+        var col = Math.max(0, Math.min(cols, Math.round(fx[i] / cw)));
+        var floor = H - heights[col];
+        if (fy[i] >= floor) {
+          if (heights[col] < H * PILE_MAX) { pile.push([fx[i], floor, c, fr[i] % .6]); heights[col] += FONT_PX * .55; }
+          state[i] = 2; born[i] = sec; fallen++;
+        } else {
+          x.fillStyle = "rgb(235,160,140)";
+          x.save(); x.translate(fx[i], fy[i]); x.rotate(fr[i]); x.fillText(c, 0, 0); x.restore();
+        }
+      } else if (sec - born[i] > REGROW) { state[i] = 0; born[i] = sec; }  // the wall always comes back
+    }
+    if (mouse.on) { x.strokeStyle = "#8a929c"; x.lineWidth = 1; x.beginPath(); x.arc(mouse.x, mouse.y, 4, 0, 7); x.stroke(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>
