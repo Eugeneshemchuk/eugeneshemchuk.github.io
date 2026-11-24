@@ -1,0 +1,211 @@
+<!doctype html>
+<!-- 4 · Wanderer: a tiny 3D night scene (walker with a lantern, a house with lit windows) drawn only with type. Glyph shape follows surface direction, glyph colour follows light. Move the pointer to turn the camera; touch letters to scramble them. Open in a browser. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wanderer</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden}
+  canvas#c{display:block;width:100vw;height:100vh;cursor:crosshair;touch-action:none}
+  #clock{position:fixed;right:16px;top:12px;font:600 12px ui-monospace,Menlo,monospace;color:#6c7488;
+    background:#0b0d14cc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+</style></head><body><canvas id="c"></canvas><div id="clock"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(function () {
+  var PHRASE = "FUCKING START LEARNING DUTCH ALREADY ";
+  var BASE = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/models/gltf/";
+  var MODEL = BASE + "Soldier.glb", BEAST = BASE + "RobotExpressive/RobotExpressive.glb";
+  // glyph families: [dim, mid, bright]; picked by the surface direction on screen
+  var FAM = {
+    front: " .:-=+*#%@",        // faces the camera: plain brightness ramp
+    flat:  ["-", "=", "#"],      // faces up/down on screen: horizontal strokes
+    side:  ["|", "I", "H"],      // faces left/right: vertical strokes
+    up:    ["/", "/", "X"],      // diagonal one way
+    down:  ["\\", "\\", "X"]     // diagonal the other way
+  };
+  var GROUND = ["<>", "=+", "<>", "-~"];   // woven floor rows
+  var FONT_PX = 7, LINE = 1.15, RADIUS = 70;
+  var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
+  var dpr, W, H, cw, ch, cols, rows, rtC, rtN, bufC, bufN;
+  var mouse = { x: -1e4, y: -1e4, nx: 0, ny: 0, on: false }, L = PHRASE.length;
+
+  // ---------- 3D scene (rendered tiny, never shown directly) ----------
+  var gl = new THREE.WebGLRenderer({ antialias: false });
+  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.Fog(0x000000, 18, 42);
+  var cam = new THREE.PerspectiveCamera(38, 1, .1, 100);
+  scene.add(new THREE.HemisphereLight(0x9aa8d8, 0x202030, .45));
+  var moon = new THREE.DirectionalLight(0xc8d4ff, 1.0); moon.position.set(-6, 12, 4); scene.add(moon);
+  var rim = new THREE.DirectionalLight(0xdfe6ff, 1.4); scene.add(rim); scene.add(rim.target);   // back light: bright edges
+  var normalMat = new THREE.MeshNormalMaterial({ skinning: true });
+
+  function mat(c, e) { return new THREE.MeshLambertMaterial({ color: c, emissive: e || 0 }); }
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), mat(0x1e2130));
+  ground.rotation.x = -Math.PI / 2; scene.add(ground);
+  var path = new THREE.Mesh(new THREE.RingGeometry(5.2, 6.6, 64), mat(0x2c2a3c));
+  path.rotation.x = -Math.PI / 2; path.position.y = .01; scene.add(path);
+
+  // house
+  var house = new THREE.Group(); scene.add(house);
+  var body = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 3), mat(0xc4cce8)); body.position.y = 1.3; house.add(body);
+  var roofShape = new THREE.Shape(); roofShape.moveTo(-1.9, 0); roofShape.lineTo(0, 1.8); roofShape.lineTo(1.9, 0);
+  var roof = new THREE.Mesh(new THREE.ExtrudeGeometry(roofShape, { depth: 5.6, bevelEnabled: false }), mat(0x8088b0));
+  roof.rotation.y = Math.PI / 2; roof.position.set(-2.8, 2.6, 0); house.add(roof);
+  var winMat = new THREE.MeshBasicMaterial({ color: 0xffa040 });
+  for (var w = -1; w <= 1; w++) {
+    var win = new THREE.Mesh(new THREE.PlaneGeometry(.8, 1.1), winMat);
+    win.position.set(w * 1.6, 1.4, 1.51); house.add(win);
+    var win2 = win.clone(); win2.position.z = -1.51; win2.rotation.y = Math.PI; house.add(win2);
+  }
+  var glow = new THREE.PointLight(0xff9a40, 1.2, 7); glow.position.set(0, 1.4, 2.4); house.add(glow);
+  for (var f = 0; f < 22; f++) {
+    var a = f / 22 * Math.PI * 2, post = new THREE.Mesh(new THREE.BoxGeometry(.12, .7, .12), mat(0x8088c0));
+    post.position.set(Math.cos(a) * 8.2, .35, Math.sin(a) * 8.2); scene.add(post);
+  }
+  [[-10, -5], [9, -7], [-7, 9], [11, 6]].forEach(function (p) {
+    var t = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3.6, 7), mat(0x3f7a74)); t.position.set(p[0], 2, p[1]); scene.add(t);
+  });
+
+  // walker: placeholder shape until the animated model loads
+  var walker = new THREE.Group(); scene.add(walker);
+  var stub = new THREE.Mesh(new THREE.CylinderGeometry(.28, .5, 1.7, 10), mat(0xd8d8e8)); stub.position.y = .85; walker.add(stub);
+  var lantern = new THREE.Mesh(new THREE.SphereGeometry(.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffb040 }));
+  lantern.position.set(-.4, .75, 0); walker.add(lantern);
+  var lamp = new THREE.PointLight(0xff8a30, 1.6, 4); walker.add(lamp);
+  var hat = new THREE.Mesh(new THREE.ConeGeometry(.42, .2, 18), mat(0xf4f0e6, 0x2a2a2a)); hat.position.y = 1.9; walker.add(hat);
+  var robe = new THREE.Mesh(new THREE.CylinderGeometry(.2, .42, .95, 14, 1, true), mat(0xb8b8cc));
+  robe.material.side = THREE.DoubleSide; robe.position.y = .62; walker.add(robe);
+  var mixer = null, headBone = null, handBone = null, tmp = new THREE.Vector3();
+
+  // monster: big dark-red robot with glowing eyes, chases the walker
+  var beast = new THREE.Group(); scene.add(beast);
+  var eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
+  var eyes = new THREE.Group(); beast.add(eyes);
+  [-.14, .14].forEach(function (ex) { var e = new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 6), eyeMat); e.position.set(ex, 0, 0); eyes.add(e); });
+  var eyeGlow = new THREE.PointLight(0xff3020, 1.4, 3.5); eyes.add(eyeGlow);
+  var bMixer = null, bHead = null;
+  new THREE.GLTFLoader().load(BEAST, function (g) {
+    var m = g.scene;
+    m.traverse(function (o) {
+      if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ color: 0xc04650, emissive: 0x2a0608, skinning: true }); o.frustumCulled = false; }
+      if (o.isBone && /^Head/.test(o.name) && !bHead) bHead = o;
+    });
+    var box = new THREE.Box3().setFromObject(m), hgt = box.max.y - box.min.y;
+    m.scale.setScalar(2.9 / hgt);                // a head taller than the walker
+    beast.add(m);
+    bMixer = new THREE.AnimationMixer(m);
+    var clip = THREE.AnimationClip.findByName(g.animations, "Running") || g.animations[0];
+    bMixer.clipAction(clip).play();
+  });
+
+  new THREE.GLTFLoader().load(MODEL, function (g) {
+    var m = g.scene;
+    m.traverse(function (o) {
+      if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ color: 0x8c8c9c, skinning: true }); o.frustumCulled = false; }
+      if (o.isBone && /Head$/.test(o.name)) headBone = o;
+      if (o.isBone && /LeftHand$/.test(o.name)) handBone = o;
+    });
+    walker.remove(stub); walker.add(m);
+    mixer = new THREE.AnimationMixer(m);
+    var clip = THREE.AnimationClip.findByName(g.animations, "Run") || g.animations[0];
+    mixer.clipAction(clip).play();
+  });
+
+  // ---------- glyph grid ----------
+  function setup() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.font = "700 " + FONT_PX + "px ui-monospace, Menlo, monospace"; x.textBaseline = "top";
+    cw = x.measureText("M").width; ch = FONT_PX * LINE;
+    cols = Math.max(2, Math.ceil(W / cw)); rows = Math.max(2, Math.ceil(H / ch));
+    if (rtC) { rtC.dispose(); rtN.dispose(); }
+    var o = { format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: true };
+    rtC = new THREE.WebGLRenderTarget(cols, rows, o); rtN = new THREE.WebGLRenderTarget(cols, rows, o);
+    bufC = new Uint8Array(cols * rows * 4); bufN = new Uint8Array(cols * rows * 4);
+    gl.setSize(cols, rows, false); cam.aspect = (cols * cw) / (rows * ch); cam.updateProjectionMatrix();
+  }
+  addEventListener("resize", setup); setup();
+  function move(e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.nx = e.clientX / W - .5; mouse.ny = e.clientY / H - .5; mouse.on = true; }
+  addEventListener("pointermove", move); addEventListener("pointerdown", move);
+  document.addEventListener("pointerleave", function () { mouse.on = false; });
+
+  function pick(fam, lum) { return fam[Math.min(2, Math.floor(lum * 3.2))]; }
+
+  var t0 = performance.now(), last = t0, camA = 0, camH = 0, shot = 0, fps = 60;
+  function frame(now) {
+    var sec = (now - t0) / 1000, dt = Math.min(.1, (now - last) / 1000); last = now;
+    fps += (1 / Math.max(dt, .001) - fps) * .05;
+    // walker loops the path
+    var wa = sec * .5;                                         // running now
+    walker.position.set(Math.cos(wa) * 5.9, 0, Math.sin(wa) * 5.9);
+    walker.rotation.y = Math.PI - wa;
+    if (mixer) {
+      mixer.update(dt);
+      walker.updateMatrixWorld(true);
+      if (headBone) { headBone.getWorldPosition(tmp); walker.worldToLocal(tmp); hat.position.set(tmp.x, tmp.y + .2, tmp.z); }
+      if (handBone) { handBone.getWorldPosition(tmp); walker.worldToLocal(tmp); lantern.position.set(tmp.x, tmp.y - .12, tmp.z); }
+    }
+    // monster stays just behind; the gap breathes, sometimes it nearly catches up
+    var gap = .55 + Math.sin(sec * .7) * .22 + Math.sin(sec * 1.9) * .06, ba = wa - gap;
+    beast.position.set(Math.cos(ba) * 5.9, 0, Math.sin(ba) * 5.9);
+    beast.rotation.y = -ba;
+    if (bMixer) {
+      bMixer.update(dt * 1.15); beast.updateMatrixWorld(true);
+      if (bHead) { bHead.getWorldPosition(tmp); beast.worldToLocal(tmp); eyes.position.set(tmp.x, tmp.y + .25, tmp.z + .32); }
+    } else eyes.position.set(0, 2.4, .3);
+    eyeGlow.intensity = 1.2 + Math.random() * .4;
+    lamp.position.copy(lantern.position);
+    lamp.intensity = 1.4 + Math.sin(sec * 13) * .2 + Math.sin(sec * 5.3) * .15;
+
+    // two shots, 7 s each, eased: close on the walker, then wide on the house
+    shot += ((Math.floor(sec / 7) % 2) - shot) * .025;
+    camA += ((wa + .6 + mouse.nx * 1.6) - camA) * .05; camH += ((mouse.ny * 4) - camH) * .05;
+    var dist = 7.5 + shot * 9.5, hgt = 3 + shot * 8.6 + camH;
+    var fx = (walker.position.x + beast.position.x) / 2, fz = (walker.position.z + beast.position.z) / 2;
+    var cx = fx * (1 - shot), cz = fz * (1 - shot);
+    cam.position.set(cx + Math.cos(camA) * dist, hgt, cz + Math.sin(camA) * dist);
+    cam.lookAt(cx, 1 + shot * .4, cz);
+    rim.position.set(walker.position.x * 2 - cam.position.x, 6, walker.position.z * 2 - cam.position.z);
+    rim.target.position.copy(walker.position);
+
+    // pass 1: colour; pass 2: view-space normals (same camera)
+    gl.setRenderTarget(rtC); gl.render(scene, cam); gl.readRenderTargetPixels(rtC, 0, 0, cols, rows, bufC);
+    scene.overrideMaterial = normalMat; var bg = scene.background; scene.background = null; gl.setClearColor(0x8080ff, 1);
+    gl.setRenderTarget(rtN); gl.render(scene, cam); gl.readRenderTargetPixels(rtN, 0, 0, cols, rows, bufN);
+    scene.overrideMaterial = null; scene.background = bg; gl.setRenderTarget(null);
+
+    x.fillStyle = "#0b0d14"; x.fillRect(0, 0, W, H);
+    var R2 = RADIUS * RADIUS, mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4, tick = Math.floor(sec * 8);
+    for (var r = 0; r < rows; r++) {
+      var py = r * ch, src = (rows - 1 - r) * cols, gRow = GROUND[r % GROUND.length];
+      for (var c = 0; c < cols; c++) {
+        var k = (src + c) * 4, R = bufC[k], G = bufC[k + 1], B = bufC[k + 2];
+        var lum = (R * .3 + G * .59 + B * .11) / 255;
+        if (lum < .03) continue;
+        var px = c * cw, dx = px - mx, dy = py - my, near = dx * dx + dy * dy < R2, g;
+        if (near) g = PHRASE[(r * cols + c + tick) % L];                 // touched: the phrase leaks through
+        else if (lum < .16) g = gRow[c % 2];
+        else {
+          var nx = bufN[k] / 127.5 - 1, ny = bufN[k + 1] / 127.5 - 1, nz = bufN[k + 2] / 127.5 - 1;
+          if (nz > .82) g = FAM.front[Math.min(9, Math.floor(Math.pow(lum, 1.2) * 10))];
+          else {
+            var ax = Math.abs(nx), ay = Math.abs(ny);
+            if (ay > ax * 2) g = pick(FAM.flat, lum);
+            else if (ax > ay * 2) g = pick(FAM.side, lum);
+            else g = pick(nx * ny > 0 ? FAM.down : FAM.up, lum);
+          }
+        }
+        if (g === " ") continue;
+        var boost = 1.1 + (1 - lum) * .6;
+        x.fillStyle = near ? "rgb(255,95,70)" :
+          "rgb(" + Math.min(255, R * boost + 20 | 0) + "," + Math.min(255, G * boost + 20 | 0) + "," + Math.min(255, B * boost + 35 | 0) + ")";
+        x.fillText(g, px, py);
+      }
+    }
+    clock.textContent = "running " + Math.floor(sec) + "s · " + Math.round(fps) + " fps · still not learning";
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
