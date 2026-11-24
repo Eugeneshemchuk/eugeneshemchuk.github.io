@@ -40,6 +40,8 @@
   #show button{background:#14181dcc}
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#14181dee;color:#e6e9ee;
     font:12px ui-monospace,Menlo,monospace;padding:6px 12px;border-radius:6px;border:1px solid #3a424d;opacity:0;transition:opacity .3s;pointer-events:none}
+  #coffee{display:block;margin-top:6px;padding:8px;text-align:center;border-radius:4px;background:#ffdd00;color:#14181d;font-weight:700;text-decoration:none}
+  #coffee:hover{filter:brightness(1.08)}
 </style></head><body>
 <canvas id="c"></canvas><div id="hud"></div><div id="toast"></div>
 <div id="show"><button id="showBtn">controls</button><button id="miniRandom">🎲</button></div>
@@ -52,6 +54,7 @@
   <textarea id="text" spellcheck="false"></textarea>
   <div id="controls"></div>
   <button id="aiCopy" style="width:100%;margin-top:10px;padding:9px;font-weight:700">⧉ copy for AI (embed prompt)</button>
+  <a id="coffee" href="https://buymeacoffee.com/eugeneshemchuk" target="_blank" rel="noopener">☕ buy me a coffee</a>
   <div class="btns"><button id="reset">reset</button><button id="link">copy link</button><button id="hide">hide (H)</button></div>
   <p class="hint">R random · Space pause · S save PNG · tap/click for Ripple &amp; Explode</p>
 </div>
