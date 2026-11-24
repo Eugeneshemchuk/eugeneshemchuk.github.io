@@ -42,6 +42,11 @@
     font:12px ui-monospace,Menlo,monospace;padding:6px 12px;border-radius:6px;border:1px solid #3a424d;opacity:0;transition:opacity .3s;pointer-events:none}
   #coffee{display:block;margin-top:6px;padding:8px;text-align:center;border-radius:4px;background:#ffdd00;color:#14181d;font-weight:700;text-decoration:none}
   #coffee:hover{filter:brightness(1.08)}
+  #thanks{position:relative;margin-top:6px;padding:8px 26px 8px 10px;border:1px solid #ffdd00;border-radius:6px;background:#1c1f14;font-size:11px;line-height:1.4;animation:pop .35s ease-out}
+  #thanks[hidden]{display:none}#thanks b{display:block;color:#ffdd00;font-size:12px}#thanks span{display:block;color:#b7bdc4}
+  #thanks a{display:inline-block;margin-top:6px;padding:4px 8px;border-radius:4px;background:#ffdd00;color:#14181d;font-weight:700;text-decoration:none}
+  #thanksX{position:absolute;top:4px;right:4px;min-height:0;padding:0 5px;border:0;background:none;color:#7d8691}
+  @keyframes pop{from{opacity:0;transform:translateY(-4px) scale(.96)}}
 </style></head><body>
 <canvas id="c"></canvas><div id="hud"></div><div id="toast"></div>
 <div id="show"><button id="showBtn">controls</button><button id="miniRandom">🎲</button></div>
@@ -54,6 +59,7 @@
   <textarea id="text" spellcheck="false"></textarea>
   <div id="controls"></div>
   <button id="aiCopy" style="width:100%;margin-top:10px;padding:9px;font-weight:700">⧉ copy for AI (embed prompt)</button>
+  <div id="thanks" hidden><b>Like my work?</b><span>This product is free thanks to donations.</span><a href="https://buymeacoffee.com/eugeneshemchuk" target="_blank" rel="noopener">☕ buy me a coffee</a><button id="thanksX" title="close">✕</button></div>
   <a id="coffee" href="https://buymeacoffee.com/eugeneshemchuk" target="_blank" rel="noopener">☕ buy me a coffee</a>
   <div class="btns"><button id="reset">reset</button><button id="link">copy link</button><button id="hide">hide (H)</button></div>
   <p class="hint">R random · Space pause · S save PNG · tap/click for Ripple &amp; Explode</p>
@@ -301,10 +307,11 @@
     ].join("\n");
   }
   $("aiCopy").onclick = function () {
-    var md = aiPrompt();
+    var md = aiPrompt(); $("thanks").hidden = false; $("coffee").style.display = "none";
     if (navigator.clipboard) navigator.clipboard.writeText(md).then(function () { toast("AI prompt copied · paste into your agent"); }, function () { prompt("Copy this prompt", md); });
     else prompt("Copy this prompt", md);
   };
+  $("thanksX").onclick = function () { $("thanks").hidden = true; $("coffee").style.display = ""; };
   var paused = false;
   addEventListener("keydown", function (e) {
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
