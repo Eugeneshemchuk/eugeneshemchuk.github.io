@@ -1,546 +1,87 @@
 <!doctype html>
-<!-- typefun: typography playground. Random, effects, favourites, colour flow. Keys: R random, H panel, Space pause, S PNG. -->
+<!-- typefun landing (deployed as /typefun/index.html). Studio lives at studio.html; old #{params} links forward there. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>typefun</title>
+<script>if (/^#(%7B|\{)/i.test(location.hash)) location.replace("studio.html" + location.hash);</script>
+<title>typefun · kinetic type backgrounds</title>
+<meta name="description" content="Free kinetic type backgrounds for your hero or card. Design one, copy one prompt, your AI agent adds it.">
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#2b313a}
-  canvas{display:block;width:100vw;height:100vh;cursor:none;touch-action:none}
-  #hud{position:fixed;right:16px;bottom:12px;font:600 12px ui-monospace,Menlo,monospace;color:#8a929c;
-    background:#0006;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
-  #panel{position:fixed;top:12px;left:12px;width:min(272px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;
-    background:#14181dee;color:#cfd4da;font:12px/1.3 ui-monospace,Menlo,monospace;border:1px solid #3a424d;
-    border-radius:10px;padding:10px 12px;box-sizing:border-box;cursor:auto;backdrop-filter:blur(6px)}
-  #panel.hidden{display:none}
-  #panel h2{margin:12px 0 6px;font-size:10px;letter-spacing:.12em;color:#7d8691;text-transform:uppercase;font-weight:600}
-  #controls details{border-top:1px solid #2a3038;margin-top:8px}
-  #controls summary{cursor:pointer;list-style:none;padding:8px 0 4px;font-size:10px;letter-spacing:.12em;color:#7d8691;text-transform:uppercase;font-weight:600;display:flex;justify-content:space-between}
-  #controls summary::-webkit-details-marker{display:none}
-  #controls summary::after{content:"+"}#controls details[open] summary::after{content:"−"}
-  @media (pointer:coarse){select,input[type=text],textarea{font-size:16px}button{min-height:44px}input[type=range]{height:32px}}
-  @media (max-width:480px){#panel{top:auto;bottom:0;left:0;width:100vw;max-height:60dvh;border-radius:14px 14px 0 0;border-width:1px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom))}
-    #show{top:auto;bottom:max(12px,env(safe-area-inset-bottom))}#hud{bottom:auto;top:12px}}
-  .row{display:grid;grid-template-columns:86px 1fr 38px;align-items:center;gap:6px;margin:4px 0}
-  .row span.v{text-align:right;color:#8a929c}
-  .row.wide{grid-template-columns:86px 1fr}
-  input[type=range]{width:100%;accent-color:#ff8a3d}
-  input[type=text],select,textarea{width:100%;box-sizing:border-box;background:#0d1014;color:#e6e9ee;border:1px solid #3a424d;
-    border-radius:4px;padding:5px 6px;font:12px ui-monospace,Menlo,monospace}
-  textarea{resize:vertical;min-height:40px}
-  input[type=color]{width:100%;height:22px;border:1px solid #3a424d;background:none;padding:0;border-radius:4px}
-  button{background:#0d1014;color:#cfd4da;border:1px solid #3a424d;border-radius:4px;padding:6px 6px;
-    font:12px ui-monospace,Menlo,monospace;cursor:pointer}
-  button:hover{border-color:#7d8691}
-  #random{width:100%;padding:11px;font-size:14px;font-weight:700;letter-spacing:.06em;color:#14181d;border:0;
-    background:linear-gradient(90deg,#ff8a3d,#ff3d7f,#7a5cff,#3dc8ff,#ff8a3d);background-size:300% 100%;animation:slide 6s linear infinite}
-  @keyframes slide{to{background-position:300% 0}}
-  .line{display:flex;gap:4px;margin-top:6px}.line select{flex:1}.line button{flex:0 0 auto}
-  .btns{display:flex;gap:4px;margin-top:10px}.btns button{flex:1}
-  .hint{color:#6b737d;font-size:11px;margin:6px 0 0}
-  #show{position:fixed;top:12px;left:12px;display:none;gap:4px}
-  #show button{background:#14181dcc}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#14181dee;color:#e6e9ee;
-    font:12px ui-monospace,Menlo,monospace;padding:6px 12px;border-radius:6px;border:1px solid #3a424d;opacity:0;transition:opacity .3s;pointer-events:none}
-  #coffee{display:block;margin-top:6px;padding:8px;text-align:center;border-radius:4px;background:#ffdd00;color:#14181d;font-weight:700;text-decoration:none}
-  #coffee:hover{filter:brightness(1.08)}
-  #thanks{position:relative;margin-top:6px;padding:8px 26px 8px 10px;border:1px solid #ffdd00;border-radius:6px;background:#1c1f14;font-size:11px;line-height:1.4;animation:pop .35s ease-out}
-  #thanks[hidden]{display:none}#thanks b{display:block;color:#ffdd00;font-size:12px}#thanks span{display:block;color:#b7bdc4}
-  #thanks a{display:inline-block;margin-top:6px;padding:4px 8px;border-radius:4px;background:#ffdd00;color:#14181d;font-weight:700;text-decoration:none}
-  #thanksX{position:absolute;top:4px;right:4px;min-height:0;padding:0 5px;border:0;background:none;color:#7d8691}
-  @keyframes pop{from{opacity:0;transform:translateY(-4px) scale(.96)}}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:#222;background:#fafafa}
+  a{color:inherit}
+  nav{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 32px;background:#fff;border-bottom:1px solid #eee}
+  nav b{font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em}
+  nav span{display:flex;gap:20px;font-size:15px}nav span a{text-decoration:none;color:#555}nav span a:hover{color:#222}
+  .hero{position:relative;overflow:hidden;padding:120px 32px;text-align:center;background:#12101c;color:#f2e9ff}
+  .hero>:not(canvas){position:relative;z-index:1}
+  .hero .scrim{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(closest-side,#12101cdd,#12101c00)}
+  .hero h1{font-size:clamp(36px,7vw,64px);margin:0 0 12px;line-height:1.05}
+  .hero p{font-size:20px;color:#d9ccf0;max-width:560px;margin:0 auto}
+  .cta{display:inline-block;margin-top:24px;padding:13px 26px;background:#ffd23f;color:#12101c;border-radius:8px;text-decoration:none;font-weight:700}
+  .ghost{display:inline-block;margin:24px 0 0 10px;padding:13px 20px;color:#f2e9ff;text-decoration:none;border:1px solid #f2e9ff55;border-radius:8px}
+  section.block{max-width:1100px;margin:0 auto;padding:64px 32px 16px}
+  h2{font-size:32px;margin:0 0 8px}.lead{color:#555;font-size:18px;margin:0 0 28px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px #0001;overflow:hidden}
+  .card .live{position:relative;height:200px}
+  .card .live canvas{position:absolute;inset:0;width:100%;height:100%}
+  .card .txt{padding:18px 22px 22px}.card h3{margin:0 0 4px}.card p{margin:0 0 10px;color:#555}
+  .card a{font-weight:600;font-size:14px}
+  .steps{counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  .step{background:#fff;padding:24px;border-radius:12px;box-shadow:0 1px 3px #0001}
+  .step::before{counter-increment:s;content:counter(s);display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#12101c;color:#ffd23f;font-weight:700;margin-bottom:10px}
+  .step h3{margin:0 0 6px}.step p{margin:0;color:#555}
+  pre{background:#12101c;color:#f2e9ff;padding:18px 20px;border-radius:12px;overflow:auto;font:13px/1.5 ui-monospace,Menlo,monospace;margin:24px 0 0}
+  pre i{color:#ffd23f;font-style:normal}
+  .free{margin:64px auto 0;max-width:1100px;padding:0 32px}
+  .free div{background:#fff8d6;border:1px solid #ffdd00;border-radius:16px;padding:40px;text-align:center}
+  .free h2{margin-bottom:8px}.free p{color:#555;font-size:18px;margin:0 auto 20px;max-width:520px}
+  .coffee{display:inline-block;padding:12px 24px;background:#ffdd00;color:#12101c;border-radius:8px;text-decoration:none;font-weight:700}
+  footer{padding:48px 32px;text-align:center;color:#888;font-size:14px}
+  @media (max-width:760px){.cards,.steps{grid-template-columns:1fr}nav{padding:14px 16px}nav span{gap:12px;font-size:14px}
+    .hero{padding:88px 16px}section.block,.free{padding-left:16px;padding-right:16px}.free div{padding:28px 18px}.ghost{margin-left:0}}
 </style></head><body>
-<canvas id="c"></canvas><div id="hud"></div><div id="toast"></div>
-<div id="show"><button id="showBtn">controls</button><button id="miniRandom">🎲</button></div>
-<div id="panel">
-  <button id="random">🎲 RANDOM</button>
-  <div class="row wide" style="margin-top:8px"><span>effect</span><select id="effect"></select></div>
-  <p class="hint" id="effectNote"></p>
-  <div class="line"><select id="favs"></select><button id="favSave" title="save as favourite">★ save</button><button id="favDel" title="delete this favourite">✕</button></div>
-  <h2>Text</h2>
-  <textarea id="text" spellcheck="false"></textarea>
-  <div id="controls"></div>
-  <button id="aiCopy" style="width:100%;margin-top:10px;padding:9px;font-weight:700">⧉ copy for AI (embed prompt)</button>
-  <div id="thanks" hidden><b>Like my work?</b><span>This product is free thanks to donations.</span><a href="https://buymeacoffee.com/eugeneshemchuk" target="_blank" rel="noopener">☕ buy me a coffee</a><button id="thanksX" title="close">✕</button></div>
-  <a id="coffee" href="https://buymeacoffee.com/eugeneshemchuk" target="_blank" rel="noopener">☕ buy me a coffee</a>
-  <div class="btns"><button id="reset">reset</button><button id="link">copy link</button><button id="hide">hide (H)</button></div>
-  <p class="hint">R random · Space pause · S save PNG · tap/click for Ripple &amp; Explode</p>
-</div>
-<script>
-(function () {
-  // ---------- effects: the mechanic + its own physics defaults ----------
-  var EFFECTS = {
-    lookaway: { label: "Look away", note: "Letters flee from the cursor.", radius: 150, strength: 1, spring: .015, damping: .86 },
-    swirl:    { label: "Swirl", note: "Letters orbit the cursor.", radius: 190, strength: 1, spring: .008, damping: .9 },
-    magnet:   { label: "Magnet", note: "Letters are pulled in and grow.", radius: 220, strength: .8, spring: .03, damping: .82 },
-    closing:  { label: "Closing in", note: "Keep moving. Sit still and it closes in.", radius: 230, strength: 1, spring: .02, damping: .85 },
-    rubble:   { label: "Rubble", note: "Touched letters fall and pile up.", radius: 60, strength: 1, spring: .015, damping: .86 },
-    ripple:   { label: "Ripple", note: "Click or tap: rings push the letters.", radius: 90, strength: 1, spring: .02, damping: .88 },
-    explode:  { label: "Explode", note: "Click or tap: letters blow apart and come back.", radius: 280, strength: 1, spring: .006, damping: .94 },
-    none:     { label: "Just motion", note: "No cursor effect. Only the motion extras.", radius: 150, strength: 1, spring: .02, damping: .86 }
-  };
-  var FONTS = {
-    mono: "ui-monospace, SFMono-Regular, Menlo, monospace", courier: "'Courier New', Courier, monospace",
-    helvetica: "'Helvetica Neue', Helvetica, Arial, sans-serif", impact: "Impact, 'Arial Black', sans-serif",
-    georgia: "Georgia, serif", times: "'Times New Roman', Times, serif", futura: "Futura, 'Avenir Next', sans-serif",
-    didot: "Didot, 'Bodoni 72', 'Bodoni MT', serif", rockwell: "Rockwell, 'American Typewriter', serif",
-    marker: "'Marker Felt', 'Comic Sans MS', cursive", chalk: "Chalkduster, 'Bradley Hand', cursive",
-    copperplate: "Copperplate, 'Copperplate Gothic Light', fantasy"
-  };
-  var DEFAULTS = {
-    text: "HELLO WORLD!", effect: "lookaway", font: "mono", size: 15, weight: 600, line: 1.55, spacing: 0,
-    sizeMix: 0, caseMode: "upper", seed: 1,
-    radius: 150, strength: 1, spring: .015, damping: .86, tilt: 0, regrow: 6, gravity: .45, pileMax: .5, calm: 2.5,
-    guiltRate: 1, jitter: 0, wave: 0, breathe: 0, spin: 0, slide: 0, glitch: 0, trail: 0,
-    flow: 0, flowSpeed: .5, palette: "rainbow", blobs: 0, bg: "#2b313a", ink: "#cdd2d8", guilt: "#ff4637", counter: 1, ring: 1
-  };
-  var CONTROLS = [
-    ["h", "Type"],
-    ["select", "font", "font", Object.keys(FONTS)],
-    ["select", "caseMode", "case", ["upper", "lower", "as typed", "mixed"]],
-    ["range", "size", "size", 4, 200, 1], ["range", "sizeMix", "size chaos", 0, 1.5, .05],
-    ["range", "weight", "weight", 100, 900, 100], ["range", "line", "line height", .5, 3.5, .05],
-    ["range", "spacing", "spacing", -40, 240, .5],
-    ["h", "Effect"],
-    ["range", "radius", "radius", 20, 600, 5], ["range", "strength", "strength", 0, 4, .05],
-    ["range", "spring", "return", 0, .08, .001], ["range", "damping", "damping", .6, .99, .01],
-    ["range", "regrow", "regrow s", 1, 30, .5, "rubble"], ["range", "gravity", "gravity", .05, 1.5, .05, "rubble"],
-    ["range", "pileMax", "pile max", .1, .9, .05, "rubble"], ["range", "calm", "calm s", .5, 10, .5, "closing"],
-    ["h", "Motion"],
-    ["range", "slide", "rows slide", 0, 3, .05], ["range", "wave", "drift wave", 0, 1.5, .02],
-    ["range", "spin", "spin", 0, 1, .02], ["range", "tilt", "tilt", 0, 1, .05],
-    ["range", "jitter", "shiver", 0, 1, .02], ["range", "breathe", "breathe", 0, 1, .02],
-    ["range", "glitch", "glitch", 0, 1, .02], ["range", "trail", "afterimage", 0, .97, .01],
-    ["h", "Colour"],
-    ["select", "palette", "palette", ["rainbow", "sunset", "electric", "mint", "ember", "ocean", "mono"]],
-    ["range", "flow", "colour flow", 0, 1, .02], ["range", "flowSpeed", "flow speed", 0, 3, .05],
-    ["range", "blobs", "floating bg", 0, 1, .02], ["range", "guiltRate", "guilt", 0, 4, .1],
-    ["color", "bg", "background"], ["color", "ink", "ink"], ["color", "guilt", "guilt"],
-    ["check", "counter", "show counter"], ["check", "ring", "show cursor ring"]
-  ];
-  var LAYOUT_KEYS = /^(size|sizeMix|weight|line|spacing|font|caseMode|text|seed)$/;
+<nav><b>typefun</b><span><a href="#effects">Effects</a><a href="#how">How it works</a><a href="studio.html">Studio</a></span></nav>
 
-  var S = Object.assign({}, DEFAULTS);
-  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  function save() { lsSet("typefun-last", S); }
+<section class="hero">
+  <canvas data-typefun='{"text":"MAKE IT MOVE","effect":"swirl","font":"futura","size":26,"weight":800,"line":1.55,"radius":220,"spring":0.008,"damping":0.9,"wave":0.4,"flow":0.8,"palette":"sunset","bg":"#12101c","ink":"#f2e9ff","guilt":"#ffd23f"}' style="position:absolute;inset:0;width:100%;height:100%;z-index:0" aria-hidden="true"></canvas>
+  <div class="scrim"></div>
+  <h1>Make your hero move</h1>
+  <p>Kinetic type backgrounds for your site. Design one in the studio, copy one prompt, and your AI agent adds it.</p>
+  <a class="cta" href="studio.html">Try it free →</a><a class="ghost" href="#how">How it works</a>
+</section>
 
-  // ---------- UI ----------
-  var $ = function (id) { return document.getElementById(id); };
-  var panel = $("panel"), ctl = $("controls"), effectEl = $("effect"), textEl = $("text"), favsEl = $("favs");
-  Object.keys(EFFECTS).forEach(function (k) {
-    var o = document.createElement("option"); o.value = k; o.textContent = EFFECTS[k].label; effectEl.appendChild(o);
-  });
-  effectEl.onchange = function () {
-    var e = EFFECTS[effectEl.value]; S.effect = effectEl.value;
-    ["radius", "strength", "spring", "damping"].forEach(function (k) { S[k] = e[k]; });
-    resetPhysics(); buildUI(); save();
-  };
-  textEl.oninput = function () { S.text = textEl.value; setup(); save(); };
+<section class="block" id="effects">
+  <h2>Move your cursor over them</h2>
+  <p class="lead">Each card is the real thing, running on the same small script you will add to your site.</p>
+  <div class="cards">
+    <div class="card"><div class="live"><canvas data-typefun='{"text":"LOOK AWAY","effect":"lookaway","font":"mono","size":14,"bg":"#2b313a","ink":"#cdd2d8","guilt":"#ff4637"}'></canvas></div>
+      <div class="txt"><h3>Look away</h3><p>Letters flee from the cursor.</p><a href="studio.html#%7B%22effect%22%3A%22lookaway%22%2C%22text%22%3A%22LOOK%20AWAY%22%7D">Open in studio →</a></div></div>
+    <div class="card"><div class="live"><canvas data-typefun='{"text":"RUBBLE","effect":"rubble","font":"impact","size":22,"weight":400,"radius":50,"bg":"#f3ede2","ink":"#2a2622","guilt":"#e0452b","guiltRate":0.4}'></canvas></div>
+      <div class="txt"><h3>Rubble</h3><p>Touched letters fall and pile up.</p><a href="studio.html#%7B%22effect%22%3A%22rubble%22%2C%22text%22%3A%22RUBBLE%22%2C%22font%22%3A%22impact%22%2C%22size%22%3A22%2C%22weight%22%3A400%2C%22radius%22%3A50%2C%22bg%22%3A%22%23f3ede2%22%2C%22ink%22%3A%22%232a2622%22%2C%22guilt%22%3A%22%23e0452b%22%7D">Open in studio →</a></div></div>
+    <div class="card"><div class="live"><canvas data-typefun='{"text":"MAGNET","effect":"magnet","font":"didot","size":20,"weight":700,"radius":180,"spring":0.03,"damping":0.82,"flow":1,"palette":"electric","bg":"#0a0820","ink":"#ffffff","guilt":"#ff2bd6","guiltRate":0}'></canvas></div>
+      <div class="txt"><h3>Magnet</h3><p>Letters are pulled in and grow.</p><a href="studio.html#%7B%22effect%22%3A%22magnet%22%2C%22text%22%3A%22MAGNET%22%2C%22font%22%3A%22didot%22%2C%22size%22%3A20%2C%22weight%22%3A700%2C%22radius%22%3A180%2C%22spring%22%3A0.03%2C%22damping%22%3A0.82%2C%22flow%22%3A1%2C%22palette%22%3A%22electric%22%2C%22bg%22%3A%22%230a0820%22%2C%22ink%22%3A%22%23ffffff%22%2C%22guiltRate%22%3A0%7D">Open in studio →</a></div></div>
+  </div>
+</section>
 
-  function buildUI() {
-    effectEl.value = S.effect; $("effectNote").textContent = EFFECTS[S.effect].note;
-    if (document.activeElement !== textEl) textEl.value = S.text;
-    ctl.innerHTML = ""; var sect = null;
-    CONTROLS.forEach(function (c) {
-      if (c[0] === "h") {
-        sect = document.createElement("details"); sect.open = closed[c[1]] !== true;
-        sect.innerHTML = "<summary>" + c[1] + "</summary>"; var nm = c[1];
-        sect.ontoggle = function () { closed[nm] = !this.open; lsSet("typefun-closed", closed); };
-        ctl.appendChild(sect); return;
-      }
-      if (c[0] === "range" && c[6] && c[6] !== S.effect) return;
-      var row = document.createElement("label"); row.className = "row" + (c[0] === "range" ? "" : " wide");
-      var lab = c[2]; if (c[1] === "radius" && S.effect === "ripple") lab = "ring width";
-      row.innerHTML = "<span>" + lab + "</span>"; var input, val;
-      if (c[0] === "range") {
-        input = document.createElement("input"); input.type = "range"; input.min = c[3]; input.max = c[4]; input.step = c[5];
-        input.value = S[c[1]]; val = document.createElement("span"); val.className = "v";
-        var fmt = function () { val.textContent = (+input.value).toFixed(c[5] < .01 ? 3 : c[5] < 1 ? 2 : 0); }; fmt();
-        input.oninput = function () { S[c[1]] = +input.value; fmt(); if (LAYOUT_KEYS.test(c[1])) setup(); save(); };
-      } else if (c[0] === "select") {
-        input = document.createElement("select");
-        c[3].forEach(function (o) { var op = document.createElement("option"); op.value = op.textContent = o; input.appendChild(op); });
-        input.value = S[c[1]]; input.onchange = function () { S[c[1]] = input.value; setup(); save(); };
-      } else if (c[0] === "color") {
-        input = document.createElement("input"); input.type = "color"; input.value = S[c[1]];
-        input.oninput = function () { S[c[1]] = input.value; document.body.style.background = S.bg; save(); };
-      } else {
-        input = document.createElement("input"); input.type = "checkbox"; input.checked = !!S[c[1]];
-        input.onchange = function () { S[c[1]] = input.checked ? 1 : 0; save(); };
-      }
-      row.appendChild(input); if (val) row.appendChild(val); (sect || ctl).appendChild(row);
-    });
-    document.body.style.background = S.bg;
-  }
-  var closed = lsGet("typefun-closed") || {};
-  function apply(next) { S = Object.assign({}, DEFAULTS, next); buildUI(); setup(); save(); }
-  function toast(msg) { var t = $("toast"); t.textContent = msg; t.style.opacity = 1; clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.opacity = 0; }, 1600); }
+<section class="block" id="how">
+  <h2>From idea to your site in three steps</h2>
+  <p class="lead">No account. No build step. One canvas and one script tag.</p>
+  <div class="steps">
+    <div class="step"><h3>Play</h3><p>Open the studio. Pick an effect, your words, fonts and colours. Hit 🎲 for surprises.</p></div>
+    <div class="step"><h3>Copy for AI</h3><p>One button copies a short prompt with the exact settings and a paste-ready snippet.</p></div>
+    <div class="step"><h3>Paste to your agent</h3><p>Give it to Claude, Cursor or any coding agent. It adds the effect to your hero or card.</p></div>
+  </div>
+<pre>&lt;canvas data-typefun='{<i>"effect":"swirl","text":"MAKE IT MOVE"</i>, …}'&gt;&lt;/canvas&gt;
+&lt;script src="https://eugeneshemchuk.github.io/typefun/typefun-embed.js" defer&gt;&lt;/script&gt;</pre>
+  <p style="text-align:center;margin-top:28px"><a class="cta" href="studio.html" style="margin-top:0">Open the studio →</a></p>
+</section>
 
-  // ---------- favourites ----------
-  var favs = lsGet("typefun-favs") || [];
-  function buildFavs(sel) {
-    favsEl.innerHTML = "";
-    var o = document.createElement("option"); o.value = ""; o.textContent = favs.length ? "★ favourites (" + favs.length + ")" : "★ no favourites yet"; favsEl.appendChild(o);
-    favs.forEach(function (f, i) { var op = document.createElement("option"); op.value = i; op.textContent = f.name; favsEl.appendChild(op); });
-    favsEl.value = sel === undefined ? "" : sel; $("favDel").disabled = favsEl.value === "";
-  }
-  favsEl.onchange = function () {
-    $("favDel").disabled = favsEl.value === "";
-    if (favsEl.value !== "") { apply(favs[+favsEl.value].s); toast("loaded ★ " + favs[+favsEl.value].name); }
-  };
-  $("favSave").onclick = function () {
-    var name = prompt("Name this favourite", EFFECTS[S.effect].label + " · " + S.font + " " + Math.round(S.size));
-    if (!name) return;
-    favs.push({ name: name, s: Object.assign({}, S) }); lsSet("typefun-favs", favs); buildFavs(String(favs.length - 1)); toast("saved ★ " + name);
-  };
-  $("favDel").onclick = function () {
-    if (favsEl.value === "") return; var i = +favsEl.value;
-    if (!confirm("Delete favourite \"" + favs[i].name + "\"?")) return;
-    favs.splice(i, 1); lsSet("typefun-favs", favs); buildFavs(); toast("deleted");
-  };
+<section class="free" id="support"><div>
+  <h2>Free to use</h2>
+  <p>No sign-up, no watermark, use it on any site. typefun stays free thanks to donations. If it saved you some time, a coffee helps.</p>
+  <a class="coffee" href="https://buymeacoffee.com/eugeneshemchuk" target="_blank" rel="noopener">☕ Buy me a coffee</a>
+</div></section>
 
-  // ---------- random ----------
-  function r(a, b) { return a + Math.random() * (b - a); }
-  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
-  function chance(p) { return Math.random() < p; }
-  function randomize() {
-    var n = { text: S.text, counter: S.counter, ring: S.ring, seed: Math.floor(r(1, 9999)) };
-    n.effect = pick(Object.keys(EFFECTS)); var e = EFFECTS[n.effect];
-    n.radius = Math.round(e.radius * r(.6, 1.6)); n.strength = +(e.strength * r(.6, 1.8)).toFixed(2); n.spring = e.spring; n.damping = e.damping;
-    n.font = pick(Object.keys(FONTS)); n.caseMode = pick(["upper", "upper", "lower", "as typed", "mixed"]);
-    // size tiers give many more scale combinations than a flat range
-    var tier = pick(["tiny", "small", "small", "mid", "mid", "big", "huge"]);
-    n.size = Math.round({ tiny: r(7, 10), small: r(9, 18), mid: r(18, 40), big: r(40, 90), huge: r(90, 180) }[tier]);
-    n.line = +pick([r(.7, 1), r(1, 1.6), r(1.6, 3)]).toFixed(2);
-    n.size = Math.max(n.size, Math.round(Math.sqrt(innerWidth * innerHeight / (8000 * .6 * n.line))));  // keep it smooth
-    var sp = pick(["tight", "none", "none", "loose", "wide", "huge"]);
-    n.spacing = +({ tight: -r(.05, .3) * n.size, none: 0, loose: r(.05, .3) * n.size, wide: r(.3, 1) * n.size, huge: r(1, 2.5) * n.size }[sp]).toFixed(1);
-    n.spacing = Math.max(-40, Math.min(240, n.spacing));
-    n.sizeMix = chance(.4) ? +r(.2, 1.3).toFixed(2) : 0;
-    n.weight = pick([100, 300, 400, 600, 800, 900]);
-    n.slide = chance(.3) ? +r(.2, 2).toFixed(2) : 0; n.wave = chance(.3) ? +r(.2, 1).toFixed(2) : 0;
-    n.spin = chance(.2) ? +r(.1, .8).toFixed(2) : 0; n.tilt = chance(.4) ? +r(.3, 1).toFixed(2) : 0;
-    n.jitter = chance(.2) ? +r(.1, .6).toFixed(2) : 0; n.breathe = chance(.3) ? +r(.2, 1).toFixed(2) : 0;
-    n.glitch = chance(.2) ? +r(.1, .7).toFixed(2) : 0; n.trail = chance(.3) ? +r(.4, .93).toFixed(2) : 0;
-    n.palette = pick(["rainbow", "sunset", "electric", "mint", "ember", "ocean", "mono"]);
-    n.flow = chance(.45) ? +r(.4, 1).toFixed(2) : 0; n.flowSpeed = +r(.1, 1.5).toFixed(2);
-    n.blobs = chance(.4) ? +r(.3, 1).toFixed(2) : 0; n.guiltRate = chance(.5) ? +r(.3, 2).toFixed(1) : 0;
-    var hue = r(0, 360), scheme = pick(["dark", "dark", "paper", "neon", "mono", "complement"]);
-    if (scheme === "dark") { n.bg = hsl(hue, 18, 14); n.ink = hsl(hue, 10, 84); n.guilt = hsl((hue + 180) % 360, 90, 60); }
-    if (scheme === "paper") { n.bg = hsl(hue, 30, 92); n.ink = hsl(hue, 30, 15); n.guilt = hsl((hue + 150) % 360, 85, 48); }
-    if (scheme === "neon") { n.bg = hsl(hue, 60, 6); n.ink = hsl((hue + 120) % 360, 100, 62); n.guilt = hsl((hue + 240) % 360, 100, 62); }
-    if (scheme === "mono") { n.bg = "#000000"; n.ink = "#ffffff"; n.guilt = hsl(hue, 100, 55); }
-    if (scheme === "complement") { n.bg = hsl(hue, 70, 45); n.ink = hsl((hue + 180) % 360, 80, 85); n.guilt = hsl((hue + 60) % 360, 90, 55); }
-    apply(n); resetPhysics(); toast("🎲 " + e.label + " · " + n.font + " " + n.size + "px");
-  }
-  $("random").onclick = randomize; $("miniRandom").onclick = randomize;
-  var PALETTES = {
-    sunset: ["#2d1b69", "#b0306a", "#ff6b3d", "#ffd23f"], electric: ["#00f0ff", "#7a5cff", "#ff2bd6"],
-    mint: ["#0b3d3a", "#21c7a8", "#c8ffe9"], ember: ["#3a0a00", "#ff4d00", "#ffb000"],
-    ocean: ["#022b4a", "#0a7cc2", "#5fe0e6", "#e8fbff"], mono: ["#444444", "#ffffff"]
-  };
-  var palCache = {};
-  function palette(t) {                    // cyclic sample, t in 0..1
-    t = ((t % 1) + 1) % 1;
-    if (S.palette === "rainbow" || !PALETTES[S.palette]) return hslRgb(t * 360, 85, 62);
-    var st = palCache[S.palette] || (palCache[S.palette] = PALETTES[S.palette].map(rgb)), n = st.length;
-    var f = t * n, i = Math.floor(f) % n, j = (i + 1) % n, u = f - Math.floor(f); u = u * u * (3 - 2 * u);
-    return [st[i][0] + (st[j][0] - st[i][0]) * u, st[i][1] + (st[j][1] - st[i][1]) * u, st[i][2] + (st[j][2] - st[i][2]) * u];
-  }
-  function hsl(h, s, l) { var c = hslRgb(h, s, l); return "#" + c.map(function (v) { return v.toString(16).padStart(2, "0"); }).join(""); }
-  function hslRgb(h, s, l) {
-    s /= 100; l /= 100; var a = s * Math.min(l, 1 - l);
-    function f(n) { var k = (n + h / 30) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }
-    return [f(0), f(8), f(4)];
-  }
-
-  // ---------- panel buttons, keys, link ----------
-  function togglePanel(force) {
-    var hide = force !== undefined ? force : !panel.classList.contains("hidden");
-    panel.classList.toggle("hidden", hide); $("show").style.display = hide ? "flex" : "none";
-  }
-  $("hide").onclick = function () { togglePanel(true); }; $("showBtn").onclick = function () { togglePanel(false); };
-  $("reset").onclick = function () { apply({ text: S.text }); resetPhysics(); toast("reset"); };
-  $("link").onclick = function () {
-    var url = location.origin + location.pathname + "#" + encodeURIComponent(JSON.stringify(S));
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast("link copied"); }, function () { prompt("Copy this link", url); });
-    else prompt("Copy this link", url);
-  };
-
-  // ---------- copy for AI: Markdown prompt with exact params + paste-ready snippet ----------
-  var EMBED_URL = "https://eugeneshemchuk.github.io/typefun/typefun-embed.js";
-  function aiPrompt() {
-    var p = {}; Object.keys(DEFAULTS).forEach(function (k) { if (k !== "counter" && k !== "ring") p[k] = S[k]; });
-    var e = EFFECTS[S.effect], json = JSON.stringify(p), attr = json.replace(/&/g, "&amp;").replace(/'/g, "&#39;");
-    var pretty = JSON.stringify(p, null, 2);
-    return [
-      "# Add a typefun kinetic-type background",
-      "",
-      "Add an animated canvas background made of moving letters to the element I point at (hero, card, section). If I name none, use the main hero. Render this exact effect.",
-      "",
-      "- Effect: **" + e.label + "**. " + e.note,
-      "- Text: \"" + S.text + "\" repeated to fill the area; font " + S.font + " " + S.size + "px, weight " + S.weight + ".",
-      "- Colours: background " + S.bg + ", ink " + S.ink + ", accent " + S.guilt + (S.flow ? ", palette " + S.palette + " flowing" : "") + ".",
-      "- Preview: " + location.origin + location.pathname + "#" + encodeURIComponent(json),
-      "",
-      "## Snippet (paste as the first child of the target element)",
-      "",
-      "```html",
-      "<canvas data-typefun='" + attr + "'",
-      "  style=\"position:absolute;inset:0;width:100%;height:100%;z-index:0\" aria-hidden=\"true\"></canvas>",
-      "<script src=\"" + EMBED_URL + "\" defer><\/script>",
-      "```",
-      "",
-      "## Rules",
-      "",
-      "1. The target element needs `position:relative; overflow:hidden` and a height. Put its content above the canvas (`position:relative; z-index:1`).",
-      "2. Keep the params exactly as given. They define the look. Only change `text`, `bg`, `ink` or `guilt` (the accent colour) if the user asks.",
-      "3. Load the script once per page. Every `canvas[data-typefun]` mounts by itself; the canvas resizes with its parent.",
-      "4. The canvas ignores clicks (`pointer-events:none`) and reads the cursor from the window, so buttons and links on top still work.",
-      "5. Keep content readable: the letters are busy. Give headings and text a colour that contrasts with `bg`, and add a soft scrim behind them if needed (e.g. `background:radial-gradient(closest-side, " + S.bg + "cc, transparent)`).",
-      "6. Built in: pauses off-screen and in hidden tabs; shows one still frame for `prefers-reduced-motion`.",
-      "7. React/Vue/SPA: render the canvas, then call `window.TypeFun.mount(canvasEl, params)` in an effect and `.destroy()` on unmount. To self-host, download the script and serve it from your own domain.",
-      "",
-      "## Params (JSON, same as data-typefun)",
-      "",
-      "```json", pretty, "```",
-      "",
-      "Key params: `effect` lookaway|swirl|magnet|closing|rubble|ripple|explode|none · `radius` px of cursor reach · `strength` force · `spring` return speed · `damping` 0.6–0.99 · motion extras `slide wave spin tilt jitter breathe glitch trail` (0 = off) · `flow` 0–1 palette colour mix · `blobs` 0–1 floating colour light · `guiltRate` how often accent-coloured runs appear (0 = never)."
-    ].join("\n");
-  }
-  $("aiCopy").onclick = function () {
-    var md = aiPrompt(); $("thanks").hidden = false; $("coffee").style.display = "none";
-    if (navigator.clipboard) navigator.clipboard.writeText(md).then(function () { toast("AI prompt copied · paste into your agent"); }, function () { prompt("Copy this prompt", md); });
-    else prompt("Copy this prompt", md);
-  };
-  $("thanksX").onclick = function () { $("thanks").hidden = true; $("coffee").style.display = ""; };
-  var paused = false;
-  addEventListener("keydown", function (e) {
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-    var k = e.key.toLowerCase();
-    if (k === "h") togglePanel();
-    if (k === "r") randomize();
-    if (k === " ") { paused = !paused; e.preventDefault(); }
-    if (k === "s") { var a = document.createElement("a"); a.download = "typefun.png"; a.href = cv.toDataURL("image/png"); a.click(); }
-  });
-
-  // ---------- engine ----------
-  var cv = $("c"), x = cv.getContext("2d"), hud = $("hud");
-  var dpr, W, H, cw, ch, cols, N = 0, G, gs, grow, gx, gy, ox, oy, vx, vy, rot, vr, heat, state, born, fx, fy, fvx, fvy, fr, fvr, pile, heights, fontStr;
-  var mouse = { x: -1e4, y: -1e4, on: false }, taps = [], prev = performance.now(), sec = 0, nextHeat = 0;
-  var busy = 0, still = 0, lastX = 0, lastY = 0, fallen = 0, rowGlitch = [];
-  function rnd(i) { var v = Math.sin((i + S.seed * 7.31) * 12.9898) * 43758.5453; return v - Math.floor(v); }
-
-  function setup() {
-    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
-    cv.width = W * dpr; cv.height = H * dpr;
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    fontStr = S.weight + " " + S.size + "px " + FONTS[S.font]; x.font = fontStr;
-    var t = (S.text || "").replace(/\s+/g, " ").trim() || " ";
-    if (S.caseMode === "upper") t = t.toUpperCase(); else if (S.caseMode === "lower") t = t.toLowerCase();
-    var P = t + " ", L = P.length;
-    cw = Math.max(2, x.measureText("M").width + S.spacing); ch = Math.max(2, S.size * S.line);
-    cols = Math.ceil(W / cw);
-    // stream layout with real glyph widths; size chaos scales each letter
-    var adv = {}, ax = [], ay = [], ag = [], as = [], ar = [], cx = 0, cy = S.size, row = 0, k = 0;
-    while (cy < H + ch * 2 && k < 20000) {
-      var c = P[k % L];
-      if (S.caseMode === "mixed") c = rnd(k + 3) < .5 ? c.toLowerCase() : c.toUpperCase();
-      var s = S.sizeMix ? Math.exp(S.sizeMix * 1.4 * (rnd(k) * 2 - 1)) : 1;
-      if (adv[c] === undefined) adv[c] = x.measureText(c).width;
-      var w = Math.max(1, adv[c] * s + S.spacing);
-      if (cx + w > W + cw && cx > 0) { cx = 0; cy += ch; row++; continue; }
-      ax.push(cx); ay.push(cy); ag.push(c); as.push(s); ar.push(row); cx += w; k++;
-    }
-    N = ax.length; G = ag; gs = Float32Array.from(as); grow = Int16Array.from(ar);
-    gx = Float32Array.from(ax); gy = Float32Array.from(ay);
-    resetPhysics();
-  }
-  function resetPhysics() {
-    ox = new Float32Array(N); oy = new Float32Array(N); vx = new Float32Array(N); vy = new Float32Array(N);
-    rot = new Float32Array(N); vr = new Float32Array(N); heat = new Float32Array(N); state = new Uint8Array(N);
-    born = new Float32Array(N).fill(-99); fx = new Float32Array(N); fy = new Float32Array(N); fvx = new Float32Array(N);
-    fvy = new Float32Array(N); fr = new Float32Array(N); fvr = new Float32Array(N); pile = []; heights = new Float32Array(cols + 2);
-    fallen = 0; still = 0; busy = 0; taps = []; rowGlitch = [];
-  }
-  addEventListener("resize", setup);
-  function move(e) { if (e.target !== cv) return; mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = true; }
-  addEventListener("pointermove", move);
-  cv.addEventListener("pointerdown", function (e) {
-    move(e); taps.push([e.clientX, e.clientY, sec]); if (taps.length > 8) taps.shift();
-    if (S.effect === "explode") {
-      var R = S.radius;
-      for (var i = 0; i < N; i++) {
-        var dx = gx[i] + ox[i] - e.clientX, dy = gy[i] + oy[i] - e.clientY, d = Math.hypot(dx, dy) + .01;
-        if (d < R) { var f = (1 - d / R) * 38 * S.strength; vx[i] += dx / d * f * r(.6, 1.2); vy[i] += dy / d * f * r(.6, 1.2) - f * .3; vr[i] += r(-.6, .6) * (1 - d / R); }
-      }
-    }
-  });
-  document.addEventListener("pointerleave", function () { mouse.on = false; });
-  addEventListener("pointerup", function (e) { if (e.pointerType !== "mouse") mouse.on = false; });
-
-  function rgb(h) { h = h.slice(1); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
-  function clock(s) { return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(Math.floor(s % 60)).padStart(2, "0"); }
-  function heatOne() {
-    var s = Math.floor(Math.random() * N), len = Math.floor(r(6, 30));
-    for (var k = 0; k < len && s + k < N; k++) heat[s + k] = Math.min(1, heat[s + k] + .5);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    var dt = Math.min(.05, (now - prev) / 1000); prev = now;
-    if (paused || !N) return;
-    sec += dt;
-    var mode = S.effect;
-    if (S.guiltRate > 0 && sec > nextHeat) { heatOne(); nextHeat = sec + Math.max(.3, 3.2 - sec / 60) / S.guiltRate; }
-    for (var i = 0; i < N; i++) heat[i] *= S.guiltRate > 0 ? 1 : .98;
-
-    var sp = Math.hypot(mouse.x - lastX, mouse.y - lastY); lastX = mouse.x; lastY = mouse.y;
-    var R = S.radius, pull = 0;
-    if (mode === "closing") {
-      busy = Math.min(1, busy + sp * .004);
-      if (sp < 1) still += dt; else still = Math.max(0, still - dt * 4);
-      if (still > S.calm) busy = Math.max(0, busy - dt * .35);
-      R = S.radius * busy; pull = Math.max(0, Math.min(1, (still - S.calm - 2) / 6));
-    }
-    // glitch: random rows jump sideways for a moment
-    if (S.glitch > 0 && Math.random() < S.glitch * .25) rowGlitch.push([Math.floor(r(0, H / ch + 2)), r(-1, 1) * (40 + 200 * S.glitch), sec + r(.05, .3)]);
-    rowGlitch = rowGlitch.filter(function (g) { return g[2] > sec; });
-    var gOff = {}; rowGlitch.forEach(function (g) { gOff[g[0]] = g[1]; });
-
-    // background: fill (with afterimage) + floating colour blobs
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.globalAlpha = S.trail > 0 ? 1 - S.trail : 1; x.fillStyle = S.bg; x.fillRect(0, 0, W, H);
-    if (S.blobs > 0) {
-      x.globalCompositeOperation = "lighter";
-      var bh = sec * S.flowSpeed * 25, rad = Math.max(W, H) * .55;
-      for (var b = 0; b < 4; b++) {
-        var bx = W * (.5 + .45 * Math.sin(sec * .21 * (b + 1) + b * 2.1)), by = H * (.5 + .45 * Math.cos(sec * .17 * (b + 1.3) + b));
-        var c = palette(bh / 360 + b * .25).map(function (v) { return v | 0; }), gr = x.createRadialGradient(bx, by, 0, bx, by, rad);
-        gr.addColorStop(0, "rgba(" + c + "," + (S.blobs * .45 * (S.trail > 0 ? 1 - S.trail : 1)) + ")"); gr.addColorStop(1, "rgba(" + c + ",0)");
-        x.fillStyle = gr; x.fillRect(0, 0, W, H);
-      }
-      x.globalCompositeOperation = "source-over";
-    }
-    x.globalAlpha = 1; x.font = fontStr; x.textBaseline = "alphabetic"; lastStyle = "";
-
-    if (S.counter) {
-      hud.style.display = "block";
-      hud.textContent = mode === "rubble" ? fallen + " letters dropped"
-        : mode === "closing" ? (still > S.calm ? "sitting still " + still.toFixed(1) + "s" : "keeping busy")
-        : mode === "ripple" || mode === "explode" ? "tap anywhere · " + clock(sec) : "postponed " + clock(sec);
-    } else hud.style.display = "none";
-
-    var INK = rgb(S.ink), GU = rgb(S.guilt);
-    if (mode === "rubble") for (var p = 0; p < pile.length; p++) { var q = pile[p]; draw(q[2], q[0], q[1], q[3], 1, 1, q[4], q[0], q[1]); }
-    var mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4, R2 = R * R, k8 = S.strength;
-    var breathe = 1 + Math.sin(sec * 1.3) * .15 * S.breathe, pad = cw * 3, W2 = W + pad;
-
-    for (i = 0; i < N; i++) {
-      var c = G[i], row = grow[i], s = gs[i];
-      // home position after the motion extras
-      var hx = gx[i], hy = gy[i];
-      if (S.slide) { var dir = row % 2 ? 1 : -1; hx = ((hx + dir * S.slide * 40 * sec * (1 + (row % 3) * .35) + pad) % W2 + W2) % W2 - pad; }
-      if (S.wave) { hx += Math.sin(gy[i] * .02 + sec * 1.1) * 14 * S.wave; hy += Math.cos(gx[i] * .015 + sec * .8) * 9 * S.wave; }
-      if (gOff[row]) hx += gOff[row];
-      if (S.breathe) s *= 1 + Math.sin(sec * 2 + i * .21) * .25 * S.breathe;
-
-      if (mode === "rubble") {
-        if (state[i] === 0) {
-          var ddx = hx - mx, ddy = hy - S.size * .35 * s - my;
-          if (c !== " " && ddx * ddx + ddy * ddy < R2) {
-            state[i] = 1; fx[i] = hx; fy[i] = hy; var dd = Math.sqrt(ddx * ddx + ddy * ddy) + .01;
-            fvx[i] = (ddx / dd * 3 + r(-1, 1)) * k8; fvy[i] = (ddy / dd * 2 - 2) * k8; fr[i] = 0; fvr[i] = r(-.15, .15);
-            continue;
-          }
-          if (c === " ") continue;
-          draw(c, hx, hy, spinOf(i), heat[i], Math.min(1, (sec - born[i]) / 1.5), s, hx, hy);
-        } else if (state[i] === 1) {
-          fvy[i] += S.gravity; fx[i] += fvx[i]; fy[i] += fvy[i]; fr[i] += fvr[i]; fvx[i] *= .99;
-          if (fx[i] < 0) { fx[i] = 0; fvx[i] *= -.5; } if (fx[i] > W - cw) { fx[i] = W - cw; fvx[i] *= -.5; }
-          var col = Math.max(0, Math.min(cols + 1, Math.round(fx[i] / cw))), floor = H - heights[col];
-          if (fy[i] >= floor) {
-            if (heights[col] < H * S.pileMax) { pile.push([fx[i], floor, c, fr[i] % .6, s]); heights[col] += S.size * .55 * s; }
-            state[i] = 2; born[i] = sec; fallen++;
-          } else draw(c, fx[i], fy[i], fr[i], .6, 1, s, fx[i], fy[i]);
-        } else if (sec - born[i] > S.regrow) { state[i] = 0; born[i] = sec; }
-        continue;
-      }
-
-      var px = hx + ox[i], py = hy - S.size * .35 * s + oy[i];
-      var dx = px - mx, dy = py - my, d = Math.sqrt(dx * dx + dy * dy) + .001, RR = R;
-      if (mode !== "ripple" && mode !== "explode" && mode !== "none" && d < RR) {
-        var f = 1 - d / RR; f = f * f;
-        if (mode === "swirl") { vx[i] += (-dy / d * 3.2 + dx / d * 1.4) * f * 3 * k8; vy[i] += (dx / d * 3.2 + dy / d * 1.4) * f * 3 * k8; }
-        else if (mode === "magnet") { vx[i] -= dx / d * f * 4 * k8; vy[i] -= dy / d * f * 4 * k8; }
-        else { var m = mode === "closing" ? 7 : 9; vx[i] += dx / d * f * m * k8; vy[i] += dy / d * f * m * k8; }
-      }
-      if (pull > 0) {
-        var hd = Math.hypot(hx - mx, hy - my);
-        if (hd < 320) { var kk = pull * (1 - hd / 320) * .9 * k8; vx[i] -= dx / d * kk; vy[i] -= dy / d * kk; }
-      }
-      if (mode === "ripple") {
-        for (var t = 0; t < taps.length; t++) {
-          var age = sec - taps[t][2]; if (age > 3) continue;
-          var tx = px - taps[t][0], ty = py - taps[t][1], td = Math.hypot(tx, ty) + .01, ringR = age * 520;
-          var band = Math.exp(-Math.pow((td - ringR) / S.radius, 2)) * (1 - age / 3);
-          if (band > .01) { vx[i] += tx / td * band * 5 * k8; vy[i] += ty / td * band * 5 * k8; }
-        }
-      }
-      if (S.jitter) { var jj = S.jitter * (.3 + heat[i]) * 1.2; vx[i] += r(-.5, .5) * jj; vy[i] += r(-.5, .5) * jj; }
-      vx[i] += -ox[i] * S.spring; vy[i] += -oy[i] * S.spring;
-      vx[i] *= S.damping; vy[i] *= S.damping; ox[i] += vx[i]; oy[i] += vy[i];
-      vr[i] += -rot[i] * S.spring * 2; vr[i] *= S.damping; rot[i] += vr[i];
-      if (c === " ") continue;
-
-      var off = Math.min(1, Math.hypot(ox[i], oy[i]) / (mode === "swirl" ? 140 : 90));
-      var h = heat[i], alpha = 1, sc = s;
-      if (mode === "lookaway" || mode === "swirl") alpha = 1 - off * (mode === "swirl" ? .75 : .85);
-      if (mode === "magnet") { h = Math.max(h, off * .9); sc *= 1 + off * .6; }
-      if (mode === "closing") {
-        var near = Math.max(0, 1 - Math.hypot(hx + ox[i] - mx, hy + oy[i] - my) / 360);
-        h = Math.max(h, Math.min(1, pull * near * 1.6 + Math.max(0, still - S.calm) / 30 * .3));
-        if (h > .3) sc *= 1 + (h - .3) * .5;
-      }
-      var ang = rot[i] + spinOf(i) + (S.tilt && off > .05 ? Math.atan2(vy[i], vx[i]) * off * S.tilt : 0);
-      var X = hx + ox[i], Y = hy + oy[i];
-      if (gOff[row] && S.glitch) {             // chromatic ghost on glitched rows
-        x.globalCompositeOperation = "lighter";
-        drawRaw(c, X - 4, Y, ang, sc, "rgba(255,0,80,.6)"); drawRaw(c, X + 4, Y, ang, sc, "rgba(0,220,255,.6)");
-        x.globalCompositeOperation = "source-over";
-      }
-      draw(c, X, Y, ang, h, alpha, sc, X, Y);
-    }
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (mouse.on && S.ring) { x.strokeStyle = S.ink; x.globalAlpha = .6; x.lineWidth = 1; x.beginPath(); x.arc(mouse.x, mouse.y, 4, 0, 7); x.stroke(); x.globalAlpha = 1; }
-
-    function spinOf(j) { return S.spin ? Math.sin(sec * 1.7 + j * .73) * Math.PI * S.spin : 0; }
-    function draw(ch_, X, Y, ang, h, a, sc, cx, cy) {
-      var col = INK;
-      if (S.flow > 0) {                       // floating colours: hue drifts across the wall and over time
-        var fc = palette((cx / W) * .55 + (cy / H) * .25 + sec * S.flowSpeed * .17);
-        col = [INK[0] + (fc[0] - INK[0]) * S.flow, INK[1] + (fc[1] - INK[1]) * S.flow, INK[2] + (fc[2] - INK[2]) * S.flow];
-      }
-      drawRaw(ch_, X, Y, ang, sc, "rgba(" + ((col[0] + (GU[0] - col[0]) * h) | 0) + "," + ((col[1] + (GU[1] - col[1]) * h) | 0) + "," +
-        ((col[2] + (GU[2] - col[2]) * h) | 0) + "," + a.toFixed(2) + ")");
-    }
-  }
-  var lastStyle = "";
-  function drawRaw(c, X, Y, ang, sc, style) {
-    if (style !== lastStyle) { x.fillStyle = style; lastStyle = style; }
-    // snap scale/angle to steps so the browser can reuse cached glyphs (free-floating values kill the glyph cache)
-    sc = Math.round(sc * 16) / 16; ang = Math.round(ang * 24) / 24;
-    if (ang || sc !== 1) { var co = Math.cos(ang) * sc * dpr, si = Math.sin(ang) * sc * dpr; x.setTransform(co, si, -si, co, X * dpr, Y * dpr); x.fillText(c, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0); }
-    else x.fillText(c, X, Y);
-  }
-
-  // ---------- start: shared link > last session > defaults ----------
-  var start = null;
-  if (location.hash.length > 2) { try { start = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch (e) {} history.replaceState(null, "", location.pathname); }
-  if (!start) start = lsGet("typefun-last");
-  if (start && !EFFECTS[start.effect]) start.effect = start.mode && EFFECTS[start.mode] ? start.mode : "lookaway";
-  S = Object.assign({}, DEFAULTS, start || {}); if (!FONTS[S.font]) S.font = "mono";
-  buildUI(); buildFavs(); setup();
-  if (innerWidth < 700) togglePanel(true);
-  requestAnimationFrame(frame);
-})();
-</script></body></html>
+<footer>Made by <a href="https://eugeneshemchuk.github.io/">Eugene Shemchuk</a> · <a href="studio.html">Studio</a> · <a href="typefun-embed.js">typefun-embed.js</a></footer>
+<script src="typefun-embed.js" defer></script>
+</body></html>
