@@ -1,12 +1,12 @@
 <!doctype html>
-<!-- 4 · Wanderer: a tiny 3D night scene (walker with a lantern, a house with lit windows) drawn only with type. Glyph shape follows surface direction, glyph colour follows light. Move the pointer to turn the camera; touch letters to scramble them. Open in a browser. -->
+<!-- 4 · Wanderer: a 3D night chase drawn only with type. Floor in big glyphs, figures in fine letters, glyph shape follows surface direction, real shadows, embers. Move the pointer to turn the camera; touch letters to scramble them. Open in a browser. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wanderer</title>
 <style>
-  html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden}
+  html,body{margin:0;height:100%;background:#07080c;overflow:hidden}
   canvas#c{display:block;width:100vw;height:100vh;cursor:crosshair;touch-action:none}
   #clock{position:fixed;right:16px;top:12px;font:600 12px ui-monospace,Menlo,monospace;color:#6c7488;
-    background:#0b0d14cc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
+    background:#07080ccc;padding:4px 8px;letter-spacing:.05em;pointer-events:none}
 </style></head><body><canvas id="c"></canvas><div id="clock"></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -14,194 +14,321 @@
 (function () {
   var PHRASE = "FUCKING START LEARNING DUTCH ALREADY ";
   var BASE = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/models/gltf/";
-  var MODEL = BASE + "Soldier.glb", BEAST = BASE + "RobotExpressive/RobotExpressive.glb";
-  // glyph families: [dim, mid, bright]; picked by the surface direction on screen
-  var FAM = {
-    front: " .:-=+*#%@",        // faces the camera: plain brightness ramp
-    flat:  ["-", "=", "#"],      // faces up/down on screen: horizontal strokes
-    side:  ["|", "I", "H"],      // faces left/right: vertical strokes
-    up:    ["/", "/", "X"],      // diagonal one way
-    down:  ["\\", "\\", "X"]     // diagonal the other way
+  var HERO = BASE + "Soldier.glb", BEAST = BASE + "RobotExpressive/RobotExpressive.glb";
+  var FAM = {                               // [dim, mid, bright], picked by surface direction on screen
+    front: " .:-=+*#%@", flat: ["-", "=", "#"], side: ["|", "I", "H"], up: ["/", "/", "X"], down: ["\\", "\\", "X"]
   };
-  var GROUND = ["<>", "=+", "<>", "-~"];   // woven floor rows
-  var FONT_PX = 7, LINE = 1.15, RADIUS = 70;
+  var CLOTH = " .;:-=szSZNG#";              // fine letters on the walker (like folds of cloth)
+  var HIDE = " .:;=xX%&WM#";                // fine letters on the monster
+  var FLOOR_HI = ["<>", "=+", "><", "+="], FLOOR_LO = [";~", "+;", "~;", ";+"];
+  var LAV = [196, 186, 240];                // floor lavender
+  var FINE_PX = 6, RADIUS = 70;
   var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
-  var dpr, W, H, cw, ch, cols, rows, rtC, rtN, bufC, bufN;
-  var mouse = { x: -1e4, y: -1e4, nx: 0, ny: 0, on: false }, L = PHRASE.length;
+  var dpr, W, H, mouse = { x: -1e4, y: -1e4, nx: 0, ny: 0, on: false }, L = PHRASE.length;
 
-  // ---------- 3D scene (rendered tiny, never shown directly) ----------
+  // ---------- renderer, scene, lights ----------
   var gl = new THREE.WebGLRenderer({ antialias: false });
-  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
-  scene.fog = new THREE.Fog(0x000000, 18, 42);
-  var cam = new THREE.PerspectiveCamera(38, 1, .1, 100);
-  scene.add(new THREE.HemisphereLight(0x9aa8d8, 0x202030, .45));
-  var moon = new THREE.DirectionalLight(0xc8d4ff, 1.0); moon.position.set(-6, 12, 4); scene.add(moon);
-  var rim = new THREE.DirectionalLight(0xdfe6ff, 1.4); scene.add(rim); scene.add(rim.target);   // back light: bright edges
-  var normalMat = new THREE.MeshNormalMaterial({ skinning: true });
+  gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap; gl.shadowMap.autoUpdate = false;
+  var scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x000000, 20, 60);
+  var cam = new THREE.PerspectiveCamera(38, 1, .1, 120);
+  function light(l) { l.layers.enableAll(); scene.add(l); return l; }
+  light(new THREE.HemisphereLight(0x8a96c8, 0x14141c, .38));
+  var moon = light(new THREE.DirectionalLight(0xc8d2ff, 1.05)); moon.position.set(-9, 16, 7);
+  moon.castShadow = true; moon.shadow.mapSize.set(1024, 1024); moon.shadow.bias = -.0015;
+  var sc = moon.shadow.camera; sc.left = sc.bottom = -16; sc.right = sc.top = 16; sc.near = 1; sc.far = 50;
+  var rim = light(new THREE.DirectionalLight(0xe4eaff, 1.3)); scene.add(rim.target);
 
+  // materials for the normal pass
+  var nMat = new THREE.MeshNormalMaterial(), nSkin = new THREE.MeshNormalMaterial({ skinning: true });
+  var idMat = new THREE.MeshBasicMaterial({ color: 0x000000 });          // floor marker in the normal pass
+  var meshes = [];
+  function reg(m, kind) {
+    m.userData.cm = m.material; m.userData.nm = kind === "floor" ? idMat : (m.isSkinnedMesh ? nSkin : nMat);
+    m.castShadow = kind !== "floor" && kind !== "glow"; m.receiveShadow = true; meshes.push(m); return m;
+  }
+  function useNormals(on) { for (var i = 0; i < meshes.length; i++) meshes[i].material = on ? meshes[i].userData.nm : meshes[i].userData.cm; }
   function mat(c, e) { return new THREE.MeshLambertMaterial({ color: c, emissive: e || 0 }); }
-  var ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), mat(0x1e2130));
-  ground.rotation.x = -Math.PI / 2; scene.add(ground);
-  var path = new THREE.Mesh(new THREE.RingGeometry(5.2, 6.6, 64), mat(0x2c2a3c));
-  path.rotation.x = -Math.PI / 2; path.position.y = .01; scene.add(path);
+  function add(parent, m, kind) { parent.add(m); return reg(m, kind); }
 
-  // house
+  // ---------- ground: grainy grass + stone path ----------
+  function noiseTex(base, spread, n) {
+    var c = document.createElement("canvas"); c.width = c.height = 256; var g = c.getContext("2d");
+    g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+    for (var i = 0; i < n; i++) {
+      var v = (Math.random() - .5) * spread; g.fillStyle = "rgba(" + (v > 0 ? "255,255,255," : "0,0,0,") + Math.abs(v).toFixed(2) + ")";
+      g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 6);
+    }
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  }
+  var grass = noiseTex("#3c3c4c", .7, 5000); grass.repeat.set(14, 14);
+  var ground = add(scene, new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshLambertMaterial({ map: grass })), "floor");
+  ground.rotation.x = -Math.PI / 2;
+  var stone = noiseTex("#6a6680", .5, 3000); stone.repeat.set(10, 1);
+  var path = add(scene, new THREE.Mesh(new THREE.RingGeometry(5.1, 6.7, 96), new THREE.MeshLambertMaterial({ map: stone })), "floor");
+  path.rotation.x = -Math.PI / 2; path.position.y = .01;
+
+  // ---------- house: dark roof with light trim, arched lit windows, door, chimney ----------
   var house = new THREE.Group(); scene.add(house);
-  var body = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 3), mat(0xc4cce8)); body.position.y = 1.3; house.add(body);
-  var roofShape = new THREE.Shape(); roofShape.moveTo(-1.9, 0); roofShape.lineTo(0, 1.8); roofShape.lineTo(1.9, 0);
-  var roof = new THREE.Mesh(new THREE.ExtrudeGeometry(roofShape, { depth: 5.6, bevelEnabled: false }), mat(0x8088b0));
-  roof.rotation.y = Math.PI / 2; roof.position.set(-2.8, 2.6, 0); house.add(roof);
-  var winMat = new THREE.MeshBasicMaterial({ color: 0xffa040 });
-  for (var w = -1; w <= 1; w++) {
-    var win = new THREE.Mesh(new THREE.PlaneGeometry(.8, 1.1), winMat);
-    win.position.set(w * 1.6, 1.4, 1.51); house.add(win);
-    var win2 = win.clone(); win2.position.z = -1.51; win2.rotation.y = Math.PI; house.add(win2);
+  add(house, new THREE.Mesh(new THREE.BoxGeometry(6, 2.8, 3.4), mat(0x6e7494))).position.y = 1.4;
+  var rs = new THREE.Shape(); rs.moveTo(-2.15, 0); rs.lineTo(0, 2.1); rs.lineTo(2.15, 0);
+  var roof = add(house, new THREE.Mesh(new THREE.ExtrudeGeometry(rs, { depth: 6.6, bevelEnabled: false }), mat(0x2c3150)));
+  roof.rotation.y = Math.PI / 2; roof.position.set(-3.3, 2.8, 0);
+  [-1, 1].forEach(function (s) {                                   // pale trim along both eaves
+    add(house, new THREE.Mesh(new THREE.BoxGeometry(6.7, .1, .1), mat(0xb8c0e8))).position.set(0, 2.82, s * 2.12);
+  });
+  add(house, new THREE.Mesh(new THREE.BoxGeometry(6.7, .1, .1), mat(0xb8c0e8))).position.set(0, 4.92, 0);
+  add(house, new THREE.Mesh(new THREE.BoxGeometry(.6, 1.3, .6), mat(0x4a4e6a))).position.set(1.8, 4.6, -.6);
+  function windowTex() {
+    var c = document.createElement("canvas"); c.width = 64; c.height = 96; var g = c.getContext("2d");
+    g.beginPath(); g.moveTo(4, 96); g.lineTo(4, 32); g.arc(32, 32, 28, Math.PI, 0); g.lineTo(60, 96); g.closePath();
+    var gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, "#ffcf7a"); gr.addColorStop(1, "#e07a28");
+    g.fillStyle = gr; g.fill(); g.strokeStyle = "#2a1a10"; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(32, 4); g.lineTo(32, 96); g.moveTo(4, 52); g.lineTo(60, 52); g.moveTo(4, 76); g.lineTo(60, 76); g.stroke();
+    return new THREE.CanvasTexture(c);
   }
-  var glow = new THREE.PointLight(0xff9a40, 1.2, 7); glow.position.set(0, 1.4, 2.4); house.add(glow);
-  for (var f = 0; f < 22; f++) {
-    var a = f / 22 * Math.PI * 2, post = new THREE.Mesh(new THREE.BoxGeometry(.12, .7, .12), mat(0x8088c0));
-    post.position.set(Math.cos(a) * 8.2, .35, Math.sin(a) * 8.2); scene.add(post);
+  var winMat = new THREE.MeshBasicMaterial({ map: windowTex(), alphaTest: .5 });
+  for (var w = 0; w < 4; w++) {
+    var wx = -2.25 + w * 1.5;
+    [1, -1].forEach(function (s) {
+      if (s === 1 && w === 1) return;                               // door goes here
+      var win = add(house, new THREE.Mesh(new THREE.PlaneGeometry(.8, 1.2), winMat), "glow");
+      win.position.set(wx, 1.5, s * 1.71); if (s < 0) win.rotation.y = Math.PI;
+    });
   }
-  [[-10, -5], [9, -7], [-7, 9], [11, 6]].forEach(function (p) {
-    var t = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3.6, 7), mat(0x3f7a74)); t.position.set(p[0], 2, p[1]); scene.add(t);
+  add(house, new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.7), mat(0x3a2418))).position.set(-.75, .85, 1.71);
+  [-2.25, .75, 2.25].forEach(function (lx) { var p = light(new THREE.PointLight(0xff9a40, .9, 5.5)); house.add(p); p.position.set(lx, 1.3, 2.6); });
+
+  // ---------- fence with gold caps, teal trees ----------
+  var capMat = new THREE.MeshBasicMaterial({ color: 0xe8b860 });
+  var R = 8.4, N = 28;
+  for (var f = 0; f < N; f++) {
+    var a = f / N * Math.PI * 2, a2 = (f + 1) / N * Math.PI * 2;
+    add(scene, new THREE.Mesh(new THREE.BoxGeometry(.12, .8, .12), mat(0x7c7cc8))).position.set(Math.cos(a) * R, .4, Math.sin(a) * R);
+    add(scene, new THREE.Mesh(new THREE.SphereGeometry(.08, 6, 5), capMat), "glow").position.set(Math.cos(a) * R, .85, Math.sin(a) * R);
+    var len = 2 * R * Math.sin(Math.PI / N), rr = R * Math.cos(Math.PI / N);
+    [.55, .25].forEach(function (y) {
+      var rail = add(scene, new THREE.Mesh(new THREE.BoxGeometry(len, .05, .05), mat(0x8a86d8)));
+      rail.position.set(Math.cos((a + a2) / 2) * rr, y, Math.sin((a + a2) / 2) * rr);
+      rail.rotation.y = -(a + a2) / 2 + Math.PI / 2;
+    });
+  }
+  [[-11, -6], [10, -8], [-8, 10], [12, 7], [-14, 3]].forEach(function (p) {
+    var t = new THREE.Group(); t.position.set(p[0], 0, p[1]); scene.add(t);
+    add(t, new THREE.Mesh(new THREE.CylinderGeometry(.15, .22, 1.6, 6), mat(0x3a3040))).position.y = .8;
+    for (var i = 0; i < 6; i++) {
+      var b = add(t, new THREE.Mesh(new THREE.IcosahedronGeometry(.7 + Math.random() * .4, 0), mat(0x4fa8a0, 0x0a2020)));
+      b.position.set((Math.random() - .5) * 1.4, 2 + Math.random() * 1.3, (Math.random() - .5) * 1.4);
+    }
   });
 
-  // walker: placeholder shape until the animated model loads
+  // ---------- characters (layer 1 = fine letters) ----------
+  function toChars(o) { o.traverse(function (k) { if (!k.isLight) k.layers.set(1); }); }
   var walker = new THREE.Group(); scene.add(walker);
-  var stub = new THREE.Mesh(new THREE.CylinderGeometry(.28, .5, 1.7, 10), mat(0xd8d8e8)); stub.position.y = .85; walker.add(stub);
-  var lantern = new THREE.Mesh(new THREE.SphereGeometry(.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffb040 }));
-  lantern.position.set(-.4, .75, 0); walker.add(lantern);
-  var lamp = new THREE.PointLight(0xff8a30, 1.6, 4); walker.add(lamp);
-  var hat = new THREE.Mesh(new THREE.ConeGeometry(.42, .2, 18), mat(0xf4f0e6, 0x2a2a2a)); hat.position.y = 1.9; walker.add(hat);
-  var robe = new THREE.Mesh(new THREE.CylinderGeometry(.2, .42, .95, 14, 1, true), mat(0xb8b8cc));
-  robe.material.side = THREE.DoubleSide; robe.position.y = .62; walker.add(robe);
-  var mixer = null, headBone = null, handBone = null, tmp = new THREE.Vector3();
-
-  // monster: big dark-red robot with glowing eyes, chases the walker
+  var stub = add(walker, new THREE.Mesh(new THREE.CylinderGeometry(.28, .5, 1.7, 10), mat(0xd8d8e8))); stub.position.y = .85;
+  var hat = add(walker, new THREE.Mesh(new THREE.ConeGeometry(.46, .2, 24), mat(0xf4f0e6, 0x303030))); hat.position.y = 1.9;
+  var lantern = add(walker, new THREE.Mesh(new THREE.SphereGeometry(.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffb040 })), "glow");
+  var lamp = light(new THREE.PointLight(0xff8a30, 1.6, 4.5)); walker.add(lamp);
+  toChars(walker);
   var beast = new THREE.Group(); scene.add(beast);
-  var eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
-  var eyes = new THREE.Group(); beast.add(eyes);
-  [-.14, .14].forEach(function (ex) { var e = new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 6), eyeMat); e.position.set(ex, 0, 0); eyes.add(e); });
-  var eyeGlow = new THREE.PointLight(0xff3020, 1.4, 3.5); eyes.add(eyeGlow);
-  var bMixer = null, bHead = null;
-  new THREE.GLTFLoader().load(BEAST, function (g) {
-    var m = g.scene;
-    m.traverse(function (o) {
-      if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ color: 0xc04650, emissive: 0x2a0608, skinning: true }); o.frustumCulled = false; }
-      if (o.isBone && /^Head/.test(o.name) && !bHead) bHead = o;
-    });
-    var box = new THREE.Box3().setFromObject(m), hgt = box.max.y - box.min.y;
-    m.scale.setScalar(2.9 / hgt);                // a head taller than the walker
-    beast.add(m);
-    bMixer = new THREE.AnimationMixer(m);
-    var clip = THREE.AnimationClip.findByName(g.animations, "Running") || g.animations[0];
-    bMixer.clipAction(clip).play();
-  });
+  var eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a }), eyes = new THREE.Group(); beast.add(eyes);
+  [-.14, .14].forEach(function (ex) { add(eyes, new THREE.Mesh(new THREE.SphereGeometry(.07, 6, 6), eyeMat), "glow").position.x = ex; });
+  var eyeGlow = light(new THREE.PointLight(0xff3020, 1.4, 4)); eyes.add(eyeGlow);
+  toChars(beast);
 
-  new THREE.GLTFLoader().load(MODEL, function (g) {
-    var m = g.scene;
+  var mixer = null, bMixer = null, headBone = null, handBone = null, bHead = null, tmp = new THREE.Vector3();
+  var loader = new THREE.GLTFLoader();
+  function dress(m, color) {
     m.traverse(function (o) {
-      if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ color: 0x8c8c9c, skinning: true }); o.frustumCulled = false; }
-      if (o.isBone && /Head$/.test(o.name)) headBone = o;
-      if (o.isBone && /LeftHand$/.test(o.name)) handBone = o;
+      if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ color: color[0], emissive: color[1], skinning: true }); o.frustumCulled = false; reg(o); }
     });
+    toChars(m);
+  }
+  loader.load(HERO, function (g) {
+    var m = g.scene; dress(m, [0xe4e4f0, 0x141418]);
+    m.traverse(function (o) { if (o.isBone && /Head$/.test(o.name)) headBone = o; if (o.isBone && /LeftHand$/.test(o.name)) handBone = o; });
     walker.remove(stub); walker.add(m);
     mixer = new THREE.AnimationMixer(m);
-    var clip = THREE.AnimationClip.findByName(g.animations, "Run") || g.animations[0];
-    mixer.clipAction(clip).play();
+    mixer.clipAction(THREE.AnimationClip.findByName(g.animations, "Run") || g.animations[0]).play();
+  });
+  loader.load(BEAST, function (g) {
+    var m = g.scene; dress(m, [0xb03a46, 0x200406]);
+    m.traverse(function (o) { if (o.isBone && /^Head/.test(o.name) && !bHead) bHead = o; });
+    var box = new THREE.Box3().setFromObject(m); m.scale.setScalar(2.9 / (box.max.y - box.min.y));
+    beast.add(m);
+    bMixer = new THREE.AnimationMixer(m);
+    bMixer.clipAction(THREE.AnimationClip.findByName(g.animations, "Running") || g.animations[0]).play();
   });
 
-  // ---------- glyph grid ----------
+  // ---------- grids ----------
+  var coarse = { px: 0 }, fine = { px: FINE_PX };
+  function grid(gd, px) {
+    gd.px = px; x.font = "700 " + px + "px ui-monospace, Menlo, monospace";
+    var cw = x.measureText("M").width, ch = px * 1.15;
+    gd.cols = Math.max(2, Math.round(W / cw)); gd.rows = Math.max(2, Math.round(H / ch));
+    gd.cw = W / gd.cols; gd.ch = H / gd.rows;
+    var o = { format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: true };
+    if (gd.rtC) { gd.rtC.setSize(gd.cols, gd.rows); gd.rtN.setSize(gd.cols, gd.rows); }
+    else { gd.rtC = new THREE.WebGLRenderTarget(gd.cols, gd.rows, o); gd.rtN = new THREE.WebGLRenderTarget(gd.cols, gd.rows, o); }
+    gd.c = new Uint8Array(gd.cols * gd.rows * 4); gd.n = new Uint8Array(gd.cols * gd.rows * 4);
+  }
   function setup() {
     dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
-    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.font = "700 " + FONT_PX + "px ui-monospace, Menlo, monospace"; x.textBaseline = "top";
-    cw = x.measureText("M").width; ch = FONT_PX * LINE;
-    cols = Math.max(2, Math.ceil(W / cw)); rows = Math.max(2, Math.ceil(H / ch));
-    if (rtC) { rtC.dispose(); rtN.dispose(); }
-    var o = { format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: true };
-    rtC = new THREE.WebGLRenderTarget(cols, rows, o); rtN = new THREE.WebGLRenderTarget(cols, rows, o);
-    bufC = new Uint8Array(cols * rows * 4); bufN = new Uint8Array(cols * rows * 4);
-    gl.setSize(cols, rows, false); cam.aspect = (cols * cw) / (rows * ch); cam.updateProjectionMatrix();
+    cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.textBaseline = "top";
+    cam.aspect = W / H; cam.updateProjectionMatrix();
+    grid(fine, FINE_PX); fine.mask = new Uint8Array(fine.cols * fine.rows); grid(coarse, coarse.px || 16);
   }
   addEventListener("resize", setup); setup();
   function move(e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.nx = e.clientX / W - .5; mouse.ny = e.clientY / H - .5; mouse.on = true; }
   addEventListener("pointermove", move); addEventListener("pointerdown", move);
   document.addEventListener("pointerleave", function () { mouse.on = false; });
 
-  function pick(fam, lum) { return fam[Math.min(2, Math.floor(lum * 3.2))]; }
+  function pass(gd, layerMask, clearA) {
+    cam.layers.mask = layerMask;
+    gl.setSize(gd.cols, gd.rows, false);
+    gl.setClearColor(0x000000, clearA);
+    gl.setRenderTarget(gd.rtC); gl.render(scene, cam); gl.readRenderTargetPixels(gd.rtC, 0, 0, gd.cols, gd.rows, gd.c);
+    useNormals(true); gl.setClearColor(0x8080ff, 0);
+    gl.setRenderTarget(gd.rtN); gl.render(scene, cam); gl.readRenderTargetPixels(gd.rtN, 0, 0, gd.cols, gd.rows, gd.n);
+    useNormals(false); gl.setRenderTarget(null);
+  }
+  function dirGlyph(gd, k, lum, front) {
+    var nx = gd.n[k] / 127.5 - 1, ny = gd.n[k + 1] / 127.5 - 1, nz = gd.n[k + 2] / 127.5 - 1, i = Math.min(2, lum * 3.2 | 0);
+    if (nz > .82) return front[Math.min(front.length - 1, Math.pow(lum, 1.15) * front.length | 0)];
+    var ax = Math.abs(nx), ay = Math.abs(ny);
+    if (ay > ax * 2) return FAM.flat[i];
+    if (ax > ay * 2) return FAM.side[i];
+    return (nx * ny > 0 ? FAM.down : FAM.up)[i];
+  }
+  var COLS = new Array(32768);              // cached colour strings, 5 bits per channel
+  function rgb(r, g, b) {
+    r = r > 255 ? 31 : r < 0 ? 0 : r >> 3; g = g > 255 ? 31 : g < 0 ? 0 : g >> 3; b = b > 255 ? 31 : b < 0 ? 0 : b >> 3;
+    var key = r << 10 | g << 5 | b;
+    return COLS[key] || (COLS[key] = "rgb(" + (r << 3 | 4) + "," + (g << 3 | 4) + "," + (b << 3 | 4) + ")");
+  }
+  var lastFill = "";
+  function fill(c) { if (c !== lastFill) { x.fillStyle = c; lastFill = c; } }
 
-  var t0 = performance.now(), last = t0, camA = 0, camH = 0, shot = 0, fps = 60;
+  // ---------- embers ----------
+  var embers = [], EMB = "*^,'`.";
+  function spawn(v, hue) {
+    tmp.copy(v).project(cam); if (tmp.z > 1) return;
+    embers.push({ x: (tmp.x + 1) / 2 * W + (Math.random() - .5) * 14, y: (1 - tmp.y) / 2 * H + (Math.random() - .5) * 10,
+      vx: (Math.random() - .5) * 26, vy: -20 - Math.random() * 40, life: 1, d: .5 + Math.random() * .8, g: EMB[Math.random() * EMB.length | 0], hue: hue });
+  }
+
+  var t0 = performance.now(), last = t0, camA = 0, camH = 0, shot = 0, fps = 60, wp = new THREE.Vector3();
   function frame(now) {
     var sec = (now - t0) / 1000, dt = Math.min(.1, (now - last) / 1000); last = now;
     fps += (1 / Math.max(dt, .001) - fps) * .05;
-    // walker loops the path
-    var wa = sec * .5;                                         // running now
-    walker.position.set(Math.cos(wa) * 5.9, 0, Math.sin(wa) * 5.9);
-    walker.rotation.y = Math.PI - wa;
+
+    // chase on the path
+    var wa = sec * .5;
+    walker.position.set(Math.cos(wa) * 5.9, 0, Math.sin(wa) * 5.9); walker.rotation.y = Math.PI - wa;
+    var gap = .55 + Math.sin(sec * .7) * .22 + Math.sin(sec * 1.9) * .06, ba = wa - gap;
+    beast.position.set(Math.cos(ba) * 5.9, 0, Math.sin(ba) * 5.9); beast.rotation.y = -ba;
     if (mixer) {
-      mixer.update(dt);
-      walker.updateMatrixWorld(true);
+      mixer.update(dt); walker.updateMatrixWorld(true);
       if (headBone) { headBone.getWorldPosition(tmp); walker.worldToLocal(tmp); hat.position.set(tmp.x, tmp.y + .2, tmp.z); }
       if (handBone) { handBone.getWorldPosition(tmp); walker.worldToLocal(tmp); lantern.position.set(tmp.x, tmp.y - .12, tmp.z); }
     }
-    // monster stays just behind; the gap breathes, sometimes it nearly catches up
-    var gap = .55 + Math.sin(sec * .7) * .22 + Math.sin(sec * 1.9) * .06, ba = wa - gap;
-    beast.position.set(Math.cos(ba) * 5.9, 0, Math.sin(ba) * 5.9);
-    beast.rotation.y = -ba;
     if (bMixer) {
       bMixer.update(dt * 1.15); beast.updateMatrixWorld(true);
       if (bHead) { bHead.getWorldPosition(tmp); beast.worldToLocal(tmp); eyes.position.set(tmp.x, tmp.y + .25, tmp.z + .32); }
     } else eyes.position.set(0, 2.4, .3);
-    eyeGlow.intensity = 1.2 + Math.random() * .4;
     lamp.position.copy(lantern.position);
     lamp.intensity = 1.4 + Math.sin(sec * 13) * .2 + Math.sin(sec * 5.3) * .15;
+    eyeGlow.intensity = 1.2 + Math.random() * .4;
 
-    // two shots, 7 s each, eased: close on the walker, then wide on the house
-    shot += ((Math.floor(sec / 7) % 2) - shot) * .025;
+    // camera: close on the chase, then a high, almost isometric wide shot of the house
+    shot += ((Math.floor(sec / 8) % 2) - shot) * .022;
     camA += ((wa + .6 + mouse.nx * 1.6) - camA) * .05; camH += ((mouse.ny * 4) - camH) * .05;
-    var dist = 7.5 + shot * 9.5, hgt = 3 + shot * 8.6 + camH;
-    var fx = (walker.position.x + beast.position.x) / 2, fz = (walker.position.z + beast.position.z) / 2;
-    var cx = fx * (1 - shot), cz = fz * (1 - shot);
-    cam.position.set(cx + Math.cos(camA) * dist, hgt, cz + Math.sin(camA) * dist);
-    cam.lookAt(cx, 1 + shot * .4, cz);
-    rim.position.set(walker.position.x * 2 - cam.position.x, 6, walker.position.z * 2 - cam.position.z);
-    rim.target.position.copy(walker.position);
+    var close = 1 - shot, shake = Math.max(0, .5 - gap) * close;                     // shake when it gets close
+    var fx = (walker.position.x + beast.position.x) / 2 * close, fz = (walker.position.z + beast.position.z) / 2 * close;
+    var dist = 7.5 + shot * 26, hgt = 3 + shot * 22 + camH, ang = camA * close + (.8 + mouse.nx) * shot;
+    cam.fov = 38 - shot * 16; cam.updateProjectionMatrix();
+    cam.position.set(fx + Math.cos(ang) * dist + (Math.random() - .5) * shake * .5, hgt, fz + Math.sin(ang) * dist);
+    cam.lookAt(fx, 1 + shot * .2, fz);
+    rim.position.set(walker.position.x * 2 - cam.position.x, 6, walker.position.z * 2 - cam.position.z); rim.target.position.copy(walker.position);
 
-    // pass 1: colour; pass 2: view-space normals (same camera)
-    gl.setRenderTarget(rtC); gl.render(scene, cam); gl.readRenderTargetPixels(rtC, 0, 0, cols, rows, bufC);
-    scene.overrideMaterial = normalMat; var bg = scene.background; scene.background = null; gl.setClearColor(0x8080ff, 1);
-    gl.setRenderTarget(rtN); gl.render(scene, cam); gl.readRenderTargetPixels(rtN, 0, 0, cols, rows, bufN);
-    scene.overrideMaterial = null; scene.background = bg; gl.setRenderTarget(null);
+    // coarse floor grid: big glyphs close up, fine glyphs wide
+    var want = Math.round(16 - shot * 9);
+    scene.fog.near = 20 + shot * 12; scene.fog.far = 60 + shot * 16;
+    if (want !== coarse.px) grid(coarse, want);
 
-    x.fillStyle = "#0b0d14"; x.fillRect(0, 0, W, H);
+    gl.shadowMap.needsUpdate = true;
+    pass(coarse, 3, 1);                 // everything (chars too, so they cast shadows)
+    pass(fine, 2, 0);                   // characters only
+
+    x.fillStyle = "#07080c"; x.fillRect(0, 0, W, H); lastFill = "";
     var R2 = RADIUS * RADIUS, mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4, tick = Math.floor(sec * 8);
-    for (var r = 0; r < rows; r++) {
-      var py = r * ch, src = (rows - 1 - r) * cols, gRow = GROUND[r % GROUND.length];
-      for (var c = 0; c < cols; c++) {
-        var k = (src + c) * 4, R = bufC[k], G = bufC[k + 1], B = bufC[k + 2];
-        var lum = (R * .3 + G * .59 + B * .11) / 255;
-        if (lum < .03) continue;
-        var px = c * cw, dx = px - mx, dy = py - my, near = dx * dx + dy * dy < R2, g;
-        if (near) g = PHRASE[(r * cols + c + tick) % L];                 // touched: the phrase leaks through
-        else if (lum < .16) g = gRow[c % 2];
-        else {
-          var nx = bufN[k] / 127.5 - 1, ny = bufN[k + 1] / 127.5 - 1, nz = bufN[k + 2] / 127.5 - 1;
-          if (nz > .82) g = FAM.front[Math.min(9, Math.floor(Math.pow(lum, 1.2) * 10))];
-          else {
-            var ax = Math.abs(nx), ay = Math.abs(ny);
-            if (ay > ax * 2) g = pick(FAM.flat, lum);
-            else if (ax > ay * 2) g = pick(FAM.side, lum);
-            else g = pick(nx * ny > 0 ? FAM.down : FAM.up, lum);
-          }
+
+    // fine mask: which fine cells hold a character
+    var F = fine, M = F.mask;
+    for (var i = 0, n = F.cols * F.rows; i < n; i++) M[i] = F.c[i * 4 + 3] > 0 ? 1 : 0;
+
+    // 1) coarse layer
+    var C = coarse; x.font = "700 " + C.px + "px ui-monospace, Menlo, monospace";
+    for (var r = 0; r < C.rows; r++) {
+      var py = r * C.ch, src = (C.rows - 1 - r) * C.cols, rowHi = FLOOR_HI[r % 4], rowLo = FLOOR_LO[r % 4];
+      var fr = Math.min(F.rows - 1, ((py + C.ch / 2) / F.ch) | 0);
+      for (var c = 0; c < C.cols; c++) {
+        var px = c * C.cw;
+        var fc = Math.min(F.cols - 1, ((px + C.cw / 2) / F.cw) | 0);
+        if (M[(F.rows - 1 - fr) * F.cols + fc]) continue;            // a character covers this cell
+        var k = (src + c) * 4, Rr = C.c[k], G = C.c[k + 1], B = C.c[k + 2];
+        var lum = (Rr * .3 + G * .59 + B * .11) / 255;
+        if (lum < .02) continue;
+        var dx = px - mx, dy = py - my, g, col;
+        var floor = C.n[k] < 8 && C.n[k + 1] < 8 && C.n[k + 2] < 8;
+        if (dx * dx + dy * dy < R2) { g = PHRASE[(r * C.cols + c + tick) % L]; col = "rgb(255,95,70)"; }
+        else if (floor) {
+          var s = Math.min(1, lum * 3.2), warm = Math.max(0, (Rr - B) / 255);
+          g = (lum > .2 ? rowHi : rowLo)[c % 2];
+          col = rgb(LAV[0] * s * (1 - warm) + Rr * warm * 2.4, LAV[1] * s * (1 - warm) + G * warm * 2, LAV[2] * s * (1 - warm * .7) + B * warm);
+        } else {
+          g = dirGlyph(C, k, Math.min(1, .25 + lum * 1.6), FAM.front);
+          var bb = 1.1 + (1 - lum) * .4; col = rgb(Rr * bb + 10, G * bb + 10, B * bb + 22);
         }
         if (g === " ") continue;
-        var boost = 1.1 + (1 - lum) * .6;
-        x.fillStyle = near ? "rgb(255,95,70)" :
-          "rgb(" + Math.min(255, R * boost + 20 | 0) + "," + Math.min(255, G * boost + 20 | 0) + "," + Math.min(255, B * boost + 35 | 0) + ")";
-        x.fillText(g, px, py);
+        fill(col); x.fillText(g, px, py);
       }
     }
+
+    // 2) fine character layer, with bright outlines
+    x.font = "700 " + F.px + "px ui-monospace, Menlo, monospace";
+    for (var r2 = 0; r2 < F.rows; r2++) {
+      var src2 = (F.rows - 1 - r2) * F.cols, py2 = r2 * F.ch;
+      for (var c2 = 0; c2 < F.cols; c2++) {
+        var idx = src2 + c2; if (!M[idx]) continue;
+        var k2 = idx * 4, R3 = F.c[k2], G3 = F.c[k2 + 1], B3 = F.c[k2 + 2];
+        var lum2 = (R3 * .3 + G3 * .59 + B3 * .11) / 255 + Math.sin(r2 * 1.7 + c2 * .35) * .05;   // cloth banding
+        var edge = !M[idx - 1] || !M[idx + 1] || !M[idx - F.cols] || !M[idx + F.cols];
+        var monster = R3 > G3 * 1.7 && R3 > 40;
+        var px2 = c2 * F.cw, dx2 = px2 - mx, dy2 = py2 - my, g2, col2;
+        if (dx2 * dx2 + dy2 * dy2 < R2) { g2 = PHRASE[(r2 * F.cols + c2 + tick) % L]; col2 = "rgb(255,95,70)"; }
+        else {
+          lum2 = Math.max(.08, Math.min(1, lum2 * 1.25 + (edge ? .35 : 0)));
+          g2 = edge ? (monster ? "#" : "S") : dirGlyph(F, k2, lum2, monster ? HIDE : CLOTH);
+          if (g2 === " ") g2 = ".";
+          var b2 = edge ? 1.9 : 1.25;
+          col2 = monster ? rgb(R3 * b2 + 30, G3 * b2 + 8, B3 * b2 + 10) : rgb(R3 * b2 + 30, G3 * b2 + 30, B3 * b2 + 38);
+        }
+        fill(col2); x.fillText(g2, px2, py2);
+      }
+    }
+
+    // 3) embers from the lantern and the monster's eyes
+    lantern.getWorldPosition(wp); if (Math.random() < .6) spawn(wp, 0);
+    eyes.getWorldPosition(wp); if (Math.random() < .35) spawn(wp, 1);
+    x.font = "700 " + Math.round(FINE_PX * 1.8 + close * 4) + "px ui-monospace, Menlo, monospace";
+    for (var e = embers.length - 1; e >= 0; e--) {
+      var p = embers[e]; p.life -= dt / p.d; if (p.life <= 0) { embers.splice(e, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vx += Math.sin(sec * 3 + e) * 20 * dt;
+      lastFill = ""; x.fillStyle = p.hue ? "rgba(255," + (60 + p.life * 60 | 0) + ",40," + p.life.toFixed(2) + ")"
+                          : "rgba(255," + (120 + p.life * 100 | 0) + ",40," + p.life.toFixed(2) + ")";
+      x.fillText(p.g, p.x, p.y);
+    }
+
     clock.textContent = "running " + Math.floor(sec) + "s · " + Math.round(fps) + " fps · still not learning";
     requestAnimationFrame(frame);
   }
