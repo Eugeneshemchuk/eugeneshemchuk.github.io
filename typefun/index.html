@@ -51,6 +51,7 @@
   <h2>Text</h2>
   <textarea id="text" spellcheck="false"></textarea>
   <div id="controls"></div>
+  <button id="aiCopy" style="width:100%;margin-top:10px;padding:9px;font-weight:700">⧉ copy for AI (embed prompt)</button>
   <div class="btns"><button id="reset">reset</button><button id="link">copy link</button><button id="hide">hide (H)</button></div>
   <p class="hint">R random · Space pause · S save PNG · tap/click for Ripple &amp; Explode</p>
 </div>
@@ -254,6 +255,52 @@
     var url = location.origin + location.pathname + "#" + encodeURIComponent(JSON.stringify(S));
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast("link copied"); }, function () { prompt("Copy this link", url); });
     else prompt("Copy this link", url);
+  };
+
+  // ---------- copy for AI: Markdown prompt with exact params + paste-ready snippet ----------
+  var EMBED_URL = "https://eugeneshemchuk.github.io/typefun/typefun-embed.js";
+  function aiPrompt() {
+    var p = {}; Object.keys(DEFAULTS).forEach(function (k) { if (k !== "counter" && k !== "ring") p[k] = S[k]; });
+    var e = EFFECTS[S.effect], json = JSON.stringify(p), attr = json.replace(/&/g, "&amp;").replace(/'/g, "&#39;");
+    var pretty = JSON.stringify(p, null, 2);
+    return [
+      "# Add a typefun kinetic-type background",
+      "",
+      "Add an animated canvas background made of moving letters to the element I point at (hero, card, section). Render this exact effect.",
+      "",
+      "- Effect: **" + e.label + "**. " + e.note,
+      "- Text: \"" + S.text + "\" repeated to fill the area; font " + S.font + " " + S.size + "px, weight " + S.weight + ".",
+      "- Colours: background " + S.bg + ", ink " + S.ink + ", accent " + S.guilt + (S.flow ? ", palette " + S.palette + " flowing" : "") + ".",
+      "- Preview: " + location.origin + location.pathname + "#" + encodeURIComponent(json),
+      "",
+      "## Snippet (paste as the first child of the target element)",
+      "",
+      "```html",
+      "<canvas data-typefun='" + attr + "'",
+      "  style=\"position:absolute;inset:0;width:100%;height:100%;z-index:0\" aria-hidden=\"true\"></canvas>",
+      "<script src=\"" + EMBED_URL + "\" defer><\/script>",
+      "```",
+      "",
+      "## Rules",
+      "",
+      "1. The target element needs `position:relative; overflow:hidden` and a height. Put its content above the canvas (`position:relative; z-index:1`).",
+      "2. Keep the params exactly as given. They define the look. Only change `text`, `bg`, `ink`, `accent` if the user asks.",
+      "3. Load the script once per page. Every `canvas[data-typefun]` mounts by itself; the canvas resizes with its parent.",
+      "4. The canvas ignores clicks (`pointer-events:none`) and reads the cursor from the window, so buttons and links on top still work.",
+      "5. Built in: pauses off-screen and in hidden tabs; shows one still frame for `prefers-reduced-motion`.",
+      "6. React/Vue/SPA: render the canvas, then call `window.TypeFun.mount(canvasEl, params)` in an effect and `.destroy()` on unmount. To self-host, download the script and serve it from your own domain.",
+      "",
+      "## Params (JSON, same as data-typefun)",
+      "",
+      "```json", pretty, "```",
+      "",
+      "Key params: `effect` lookaway|swirl|magnet|closing|rubble|ripple|explode|none · `radius` px of cursor reach · `strength` force · `spring` return speed · `damping` 0.6–0.99 · motion extras `slide wave spin tilt jitter breathe glitch trail` (0 = off) · `flow` 0–1 palette colour mix · `blobs` 0–1 floating colour light · `guiltRate` how often accent-coloured runs appear (0 = never)."
+    ].join("\n");
+  }
+  $("aiCopy").onclick = function () {
+    var md = aiPrompt();
+    if (navigator.clipboard) navigator.clipboard.writeText(md).then(function () { toast("AI prompt copied · paste into your agent"); }, function () { prompt("Copy this prompt", md); });
+    else prompt("Copy this prompt", md);
   };
   var paused = false;
   addEventListener("keydown", function (e) {
