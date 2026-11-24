@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 4 · Wanderer: a 3D night chase drawn only with type. Floor in big glyphs, figures in fine letters, glyph shape follows surface direction, real shadows, embers. Move the pointer to turn the camera; touch letters to scramble them. Open in a browser. -->
+<!-- 4 · Wanderer: a 3D night chase around a gothic cathedral, drawn only with type. Floor in big glyphs, figures in fine letters, glyph shape follows surface direction, real shadows, embers. Move the pointer to turn the camera; touch letters to scramble them. Open in a browser. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Wanderer</title>
 <style>
@@ -22,7 +22,7 @@
   var HIDE = " .:;=xX%&WM#";                // fine letters on the monster
   var FLOOR_HI = ["<>", "=+", "><", "+="], FLOOR_LO = [";~", "+;", "~;", ";+"];
   var LAV = [196, 186, 240];                // floor lavender
-  var FINE_PX = 6, RADIUS = 70;
+  var FINE_PX = 6, RADIUS = 70, WIDE_A = +(location.search.match(/[?&]a=([-.0-9]+)/) || [0, 1.75])[1];
   var cv = document.getElementById("c"), x = cv.getContext("2d"), clock = document.getElementById("clock");
   var dpr, W, H, mouse = { x: -1e4, y: -1e4, nx: 0, ny: 0, on: false }, L = PHRASE.length;
 
@@ -34,8 +34,8 @@
   function light(l) { l.layers.enableAll(); scene.add(l); return l; }
   light(new THREE.HemisphereLight(0x8a96c8, 0x14141c, .38));
   var moon = light(new THREE.DirectionalLight(0xc8d2ff, 1.05)); moon.position.set(-9, 16, 7);
-  moon.castShadow = true; moon.shadow.mapSize.set(1024, 1024); moon.shadow.bias = -.0015;
-  var sc = moon.shadow.camera; sc.left = sc.bottom = -16; sc.right = sc.top = 16; sc.near = 1; sc.far = 50;
+  moon.castShadow = true; moon.shadow.mapSize.set(2048, 2048); moon.shadow.bias = -.0015;
+  var sc = moon.shadow.camera; sc.left = sc.bottom = -22; sc.right = sc.top = 22; sc.near = 1; sc.far = 50;
   var rim = light(new THREE.DirectionalLight(0xe4eaff, 1.3)); scene.add(rim.target);
 
   // materials for the normal pass
@@ -60,47 +60,87 @@
     }
     var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
   }
-  var grass = noiseTex("#3c3c4c", .7, 5000); grass.repeat.set(14, 14);
+  var grass = noiseTex("#3c3c4c", .7, 5000); grass.repeat.set(18, 18);
   var ground = add(scene, new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshLambertMaterial({ map: grass })), "floor");
   ground.rotation.x = -Math.PI / 2;
-  var stone = noiseTex("#6a6680", .5, 3000); stone.repeat.set(10, 1);
-  var path = add(scene, new THREE.Mesh(new THREE.RingGeometry(5.1, 6.7, 96), new THREE.MeshLambertMaterial({ map: stone })), "floor");
+  var stone = noiseTex("#6a6680", .5, 3000); stone.repeat.set(14, 1);
+  var path = add(scene, new THREE.Mesh(new THREE.RingGeometry(7.6, 9.2, 120), new THREE.MeshLambertMaterial({ map: stone })), "floor");
   path.rotation.x = -Math.PI / 2; path.position.y = .01;
 
-  // ---------- house: dark roof with light trim, arched lit windows, door, chimney ----------
-  var house = new THREE.Group(); scene.add(house);
-  add(house, new THREE.Mesh(new THREE.BoxGeometry(6, 2.8, 3.4), mat(0x6e7494))).position.y = 1.4;
-  var rs = new THREE.Shape(); rs.moveTo(-2.15, 0); rs.lineTo(0, 2.1); rs.lineTo(2.15, 0);
-  var roof = add(house, new THREE.Mesh(new THREE.ExtrudeGeometry(rs, { depth: 6.6, bevelEnabled: false }), mat(0x2c3150)));
-  roof.rotation.y = Math.PI / 2; roof.position.set(-3.3, 2.8, 0);
-  [-1, 1].forEach(function (s) {                                   // pale trim along both eaves
-    add(house, new THREE.Mesh(new THREE.BoxGeometry(6.7, .1, .1), mat(0xb8c0e8))).position.set(0, 2.82, s * 2.12);
+  // ---------- gothic cathedral: nave, west towers with spires, rose window, lancets, buttresses, transept, apse ----------
+  var church = new THREE.Group(); church.rotation.y = .35; scene.add(church);
+  var STONE = 0x8088b0, DARK = 0x343a62, TRIM = 0xb8c0ea;
+  function box(w, h, d, c, px, py, pz) { var m = add(church, new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c))); m.position.set(px, py, pz); return m; }
+  function gable(halfW, hgt, len, c) {
+    var sh = new THREE.Shape(); sh.moveTo(-halfW, 0); sh.lineTo(0, hgt); sh.lineTo(halfW, 0);
+    return add(church, new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: len, bevelEnabled: false }), mat(c)));
+  }
+  function spire(r, h, c, px, py, pz) { var m = add(church, new THREE.Mesh(new THREE.ConeGeometry(r, h, 4), mat(c))); m.rotation.y = Math.PI / 4; m.position.set(px, py, pz); return m; }
+  function glassTex(rose) {
+    var c = document.createElement("canvas"); c.width = 64; c.height = rose ? 64 : 160; var g = c.getContext("2d");
+    var pal = ["#ffc36a", "#f09a3a", "#ffd890", "#d86a2a", "#b8342c", "#3a5aa8"];
+    g.save(); g.beginPath();
+    if (rose) g.arc(32, 32, 30, 0, Math.PI * 2);
+    else { g.moveTo(6, 160); g.lineTo(6, 52); g.quadraticCurveTo(6, 10, 32, 2); g.quadraticCurveTo(58, 10, 58, 52); g.lineTo(58, 160); g.closePath(); }
+    g.clip();
+    for (var yy = 0; yy < c.height; yy += 8) for (var xx = 0; xx < 64; xx += 8) {
+      g.fillStyle = pal[Math.random() < .82 ? Math.random() * 4 | 0 : 4 + (Math.random() * 2 | 0)]; g.fillRect(xx, yy, 8, 8);
+    }
+    g.strokeStyle = "#1c120c"; g.lineWidth = 3; g.beginPath();
+    if (rose) { for (var i = 0; i < 12; i++) { var an = i / 12 * Math.PI * 2; g.moveTo(32, 32); g.lineTo(32 + Math.cos(an) * 30, 32 + Math.sin(an) * 30); } g.moveTo(42, 32); g.arc(32, 32, 10, 0, Math.PI * 2); }
+    else { g.moveTo(32, 2); g.lineTo(32, 160); for (var t = 60; t < 160; t += 26) { g.moveTo(6, t); g.lineTo(58, t); } }
+    g.stroke(); g.restore();
+    var tx = new THREE.CanvasTexture(c); tx.generateMipmaps = false; tx.minFilter = THREE.LinearFilter; return tx;   // no mipmaps: far glass stays solid
+  }
+  var lancetMat = new THREE.MeshBasicMaterial({ map: glassTex(false), alphaTest: .5 });
+  var roseMat = new THREE.MeshBasicMaterial({ map: glassTex(true), alphaTest: .5 });
+  function glass(m, w, h, px, py, pz, ry) { var g = add(church, new THREE.Mesh(new THREE.PlaneGeometry(w, h), m), "glow"); g.position.set(px, py, pz); g.rotation.y = ry; return g; }
+
+  // nave + steep roof + ridge
+  box(9, 3.6, 3.2, STONE, 0, 1.8, 0);
+  var nr = gable(1.9, 2.8, 9, DARK); nr.rotation.y = Math.PI / 2; nr.position.set(-4.5, 3.6, 0);
+  box(9.1, .1, .1, TRIM, 0, 6.4, 0);
+  [-1, 1].forEach(function (s) {
+    box(9.1, .1, .1, TRIM, 0, 3.62, s * 1.9);
+    for (var i = 0; i < 5; i++) {
+      var bx = -3.6 + i * 1.8;
+      box(.3, 3.0, .5, STONE, bx, 1.5, s * 1.85);                                  // buttress
+      spire(.2, .9, TRIM, bx, 3.45, s * 1.9);                                     // pinnacle
+      if (i < 4) {
+        glass(lancetMat, 1.0, 2.2, bx + .9, 1.6, s * 1.61, s > 0 ? 0 : Math.PI);          // aisle lancet
+        glass(lancetMat, .6, 1.0, bx + .9, 3.05, s * 1.61, s > 0 ? 0 : Math.PI);          // clerestory
+      }
+    }
   });
-  add(house, new THREE.Mesh(new THREE.BoxGeometry(6.7, .1, .1), mat(0xb8c0e8))).position.set(0, 4.92, 0);
-  add(house, new THREE.Mesh(new THREE.BoxGeometry(.6, 1.3, .6), mat(0x4a4e6a))).position.set(1.8, 4.6, -.6);
-  function windowTex() {
-    var c = document.createElement("canvas"); c.width = 64; c.height = 96; var g = c.getContext("2d");
-    g.beginPath(); g.moveTo(4, 96); g.lineTo(4, 32); g.arc(32, 32, 28, Math.PI, 0); g.lineTo(60, 96); g.closePath();
-    var gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, "#ffcf7a"); gr.addColorStop(1, "#e07a28");
-    g.fillStyle = gr; g.fill(); g.strokeStyle = "#2a1a10"; g.lineWidth = 4;
-    g.beginPath(); g.moveTo(32, 4); g.lineTo(32, 96); g.moveTo(4, 52); g.lineTo(60, 52); g.moveTo(4, 76); g.lineTo(60, 76); g.stroke();
-    return new THREE.CanvasTexture(c);
-  }
-  var winMat = new THREE.MeshBasicMaterial({ map: windowTex(), alphaTest: .5 });
-  for (var w = 0; w < 4; w++) {
-    var wx = -2.25 + w * 1.5;
-    [1, -1].forEach(function (s) {
-      if (s === 1 && w === 1) return;                               // door goes here
-      var win = add(house, new THREE.Mesh(new THREE.PlaneGeometry(.8, 1.2), winMat), "glow");
-      win.position.set(wx, 1.5, s * 1.71); if (s < 0) win.rotation.y = Math.PI;
-    });
-  }
-  add(house, new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.7), mat(0x3a2418))).position.set(-.75, .85, 1.71);
-  [-2.25, .75, 2.25].forEach(function (lx) { var p = light(new THREE.PointLight(0xff9a40, .9, 5.5)); house.add(p); p.position.set(lx, 1.3, 2.6); });
+  // transept + crossing spire
+  box(1.9, 3.4, 6.6, STONE, 1.4, 1.7, 0);
+  var tr = gable(1.05, 2.4, 6.6, DARK); tr.position.set(1.4, 3.4, -3.3);
+  [-1, 1].forEach(function (s) { glass(roseMat, 1.1, 1.1, 1.4, 2.2, s * 3.31, s > 0 ? 0 : Math.PI); });
+  spire(.45, 3.6, DARK, 1.4, 7.6, 0);
+  // apse
+  var apse = add(church, new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 3.4, 12, 1, false, 0, Math.PI), mat(STONE)));
+  apse.position.set(4.5, 1.7, 0);
+  var apr = add(church, new THREE.Mesh(new THREE.ConeGeometry(1.75, 2.2, 12, 1, false, 0, Math.PI), mat(DARK))); apr.position.set(4.5, 4.5, 0);
+  // west front: two towers with spires, rose window, pointed door
+  [-1, 1].forEach(function (s) {
+    box(1.6, 7.2, 1.6, STONE, -5.1, 3.6, s * 1.35);
+    box(1.7, .12, 1.7, TRIM, -5.1, 7.2, s * 1.35);
+    spire(1.1, 4.2, DARK, -5.1, 9.3, s * 1.35);
+    [[-.7, -.7], [-.7, .7], [.7, -.7], [.7, .7]].forEach(function (q) { spire(.14, .8, TRIM, -5.1 + q[0], 7.6, s * 1.35 + q[1]); });
+    glass(lancetMat, .5, 1.5, -5.91, 5.2, s * 1.35, -Math.PI / 2);
+  });
+  box(.6, 4.6, 1.2, STONE, -4.8, 2.3, 0);
+  glass(roseMat, 1.5, 1.5, -5.11, 3.6, 0, -Math.PI / 2);
+  var door = add(church, new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.9), new THREE.MeshLambertMaterial({ color: 0x24140c })));
+  door.position.set(-5.11, .95, 0); door.rotation.y = -Math.PI / 2;
+  // warm light spilling out of the glass
+  [[-2.7, 2.6], [.9, 2.6], [-2.7, -2.6], [.9, -2.6], [-6.4, 0], [1.4, 4.2]].forEach(function (q) {
+    var pl = light(new THREE.PointLight(0xff9440, .8, 6)); church.add(pl); pl.position.set(q[0], 1.6, q[1]);
+  });
 
   // ---------- fence with gold caps, teal trees ----------
   var capMat = new THREE.MeshBasicMaterial({ color: 0xe8b860 });
-  var R = 8.4, N = 28;
+  var R = 11.2, N = 40;
   for (var f = 0; f < N; f++) {
     var a = f / N * Math.PI * 2, a2 = (f + 1) / N * Math.PI * 2;
     add(scene, new THREE.Mesh(new THREE.BoxGeometry(.12, .8, .12), mat(0x7c7cc8))).position.set(Math.cos(a) * R, .4, Math.sin(a) * R);
@@ -112,7 +152,7 @@
       rail.rotation.y = -(a + a2) / 2 + Math.PI / 2;
     });
   }
-  [[-11, -6], [10, -8], [-8, 10], [12, 7], [-14, 3]].forEach(function (p) {
+  [[-15, -8], [14, -11], [-11, 14], [16, 9], [-18, 3], [4, -17]].forEach(function (p) {
     var t = new THREE.Group(); t.position.set(p[0], 0, p[1]); scene.add(t);
     add(t, new THREE.Mesh(new THREE.CylinderGeometry(.15, .22, 1.6, 6), mat(0x3a3040))).position.y = .8;
     for (var i = 0; i < 6; i++) {
@@ -216,16 +256,17 @@
       vx: (Math.random() - .5) * 26, vy: -20 - Math.random() * 40, life: 1, d: .5 + Math.random() * .8, g: EMB[Math.random() * EMB.length | 0], hue: hue });
   }
 
-  var t0 = performance.now(), last = t0, camA = 0, camH = 0, shot = 0, fps = 60, wp = new THREE.Vector3();
+  window.__wanderer = { coarse: coarse, fine: fine, scene: scene, cam: cam };      // for debugging in the console
+  var t0 = performance.now() - (+(location.search.match(/[?&]t=(\d+)/) || [0, 0])[1]) * 1000, last = performance.now(), camA = 0, camH = 0, shot = -1, fps = 60, wp = new THREE.Vector3();
   function frame(now) {
     var sec = (now - t0) / 1000, dt = Math.min(.1, (now - last) / 1000); last = now;
     fps += (1 / Math.max(dt, .001) - fps) * .05;
 
     // chase on the path
-    var wa = sec * .5;
-    walker.position.set(Math.cos(wa) * 5.9, 0, Math.sin(wa) * 5.9); walker.rotation.y = Math.PI - wa;
-    var gap = .55 + Math.sin(sec * .7) * .22 + Math.sin(sec * 1.9) * .06, ba = wa - gap;
-    beast.position.set(Math.cos(ba) * 5.9, 0, Math.sin(ba) * 5.9); beast.rotation.y = -ba;
+    var wa = sec * .36;
+    walker.position.set(Math.cos(wa) * 8.4, 0, Math.sin(wa) * 8.4); walker.rotation.y = Math.PI - wa;
+    var gap = .4 + Math.sin(sec * .7) * .16 + Math.sin(sec * 1.9) * .04, ba = wa - gap;
+    beast.position.set(Math.cos(ba) * 8.4, 0, Math.sin(ba) * 8.4); beast.rotation.y = -ba;
     if (mixer) {
       mixer.update(dt); walker.updateMatrixWorld(true);
       if (headBone) { headBone.getWorldPosition(tmp); walker.worldToLocal(tmp); hat.position.set(tmp.x, tmp.y + .2, tmp.z); }
@@ -240,11 +281,11 @@
     eyeGlow.intensity = 1.2 + Math.random() * .4;
 
     // camera: close on the chase, then a high, almost isometric wide shot of the house
-    shot += ((Math.floor(sec / 8) % 2) - shot) * .022;
+    var target = Math.floor(sec / 8) % 2; if (shot < 0) shot = target; shot += (target - shot) * .022;
     camA += ((wa + .6 + mouse.nx * 1.6) - camA) * .05; camH += ((mouse.ny * 4) - camH) * .05;
-    var close = 1 - shot, shake = Math.max(0, .5 - gap) * close;                     // shake when it gets close
+    var close = 1 - shot, shake = Math.max(0, .36 - gap) * 1.4 * close;                     // shake when it gets close
     var fx = (walker.position.x + beast.position.x) / 2 * close, fz = (walker.position.z + beast.position.z) / 2 * close;
-    var dist = 7.5 + shot * 26, hgt = 3 + shot * 22 + camH, ang = camA * close + (.8 + mouse.nx) * shot;
+    var dist = 7.5 + shot * 34, hgt = 3 + shot * 28 + camH, ang = camA * close + (WIDE_A + mouse.nx) * shot;
     cam.fov = 38 - shot * 16; cam.updateProjectionMatrix();
     cam.position.set(fx + Math.cos(ang) * dist + (Math.random() - .5) * shake * .5, hgt, fz + Math.sin(ang) * dist);
     cam.lookAt(fx, 1 + shot * .2, fz);
@@ -252,7 +293,7 @@
 
     // coarse floor grid: big glyphs close up, fine glyphs wide
     var want = Math.round(16 - shot * 9);
-    scene.fog.near = 20 + shot * 12; scene.fog.far = 60 + shot * 16;
+    scene.fog.near = 20 + shot * 18; scene.fog.far = 60 + shot * 26;
     if (want !== coarse.px) grid(coarse, want);
 
     gl.shadowMap.needsUpdate = true;
@@ -285,7 +326,8 @@
           var s = Math.min(1, lum * 3.2), warm = Math.max(0, (Rr - B) / 255);
           g = (lum > .2 ? rowHi : rowLo)[c % 2];
           col = rgb(LAV[0] * s * (1 - warm) + Rr * warm * 2.4, LAV[1] * s * (1 - warm) + G * warm * 2, LAV[2] * s * (1 - warm * .7) + B * warm);
-        } else {
+        } else if (Rr > 150 && Rr > B * 1.8) { g = lum > .55 ? "#" : "H"; col = rgb(Rr * 1.1 + 20, G * 1.05 + 8, B); }   // lit glass
+        else {
           g = dirGlyph(C, k, Math.min(1, .25 + lum * 1.6), FAM.front);
           var bb = 1.1 + (1 - lum) * .4; col = rgb(Rr * bb + 10, G * bb + 10, B * bb + 22);
         }
