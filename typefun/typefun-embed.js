@@ -10,7 +10,8 @@
     georgia: "Georgia, serif", times: "'Times New Roman', Times, serif", futura: "Futura, 'Avenir Next', sans-serif",
     didot: "Didot, 'Bodoni 72', 'Bodoni MT', serif", rockwell: "Rockwell, 'American Typewriter', serif",
     marker: "'Marker Felt', 'Comic Sans MS', cursive", chalk: "Chalkduster, 'Bradley Hand', cursive",
-    copperplate: "Copperplate, 'Copperplate Gothic Light', fantasy"
+    copperplate: "Copperplate, 'Copperplate Gothic Light', fantasy",
+    system: "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
   };
   var DEFAULTS = {
     text: "HELLO WORLD!", effect: "lookaway", font: "mono", size: 15, weight: 600, line: 1.55, spacing: 0,
@@ -22,7 +23,8 @@
   var PALETTES = {
     sunset: ["#2d1b69", "#b0306a", "#ff6b3d", "#ffd23f"], electric: ["#00f0ff", "#7a5cff", "#ff2bd6"],
     mint: ["#0b3d3a", "#21c7a8", "#c8ffe9"], ember: ["#3a0a00", "#ff4d00", "#ffb000"],
-    ocean: ["#022b4a", "#0a7cc2", "#5fe0e6", "#e8fbff"], mono: ["#444444", "#ffffff"]
+    ocean: ["#022b4a", "#0a7cc2", "#5fe0e6", "#e8fbff"], mono: ["#444444", "#ffffff"],
+    heat: ["#4f86ff", "#ffd23f", "#ff8a00", "#ff1500"]
   };
   function r(a, b) { return a + Math.random() * (b - a); }
   function rgb(h) { h = h.slice(1); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
@@ -48,17 +50,17 @@
     }
     var dpr, W, H, cw, ch, cols, N = 0, G, gs, grow, gx, gy, ox, oy, vx, vy, rot, vr, heat, state, born, fx, fy, fvx, fvy, fr, fvr, pile, heights, fontStr;
     var mouse = { x: -1e4, y: -1e4, on: false }, taps = [], prev = performance.now(), sec = 0, nextHeat = 0;
-    var busy = 0, still = 0, lastX = 0, lastY = 0, rowGlitch = [], lastStyle = "";
+    var busy = 0, still = 0, lastX = 0, lastY = 0, rowGlitch = [], lastStyle = "", hcX = 0, hcY = 0, HW = {};
     function rnd(i) { var v = Math.sin((i + S.seed * 7.31) * 12.9898) * 43758.5453; return v - Math.floor(v); }
 
     function setup() {
       var rect = cv.getBoundingClientRect();
       dpr = Math.min(devicePixelRatio || 1, 2); W = Math.max(1, rect.width); H = Math.max(1, rect.height);
       cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
-      fontStr = S.weight + " " + S.size + "px " + FONTS[S.font]; x.font = fontStr;
+      fontStr = S.weight + " " + S.size + "px " + FONTS[S.font]; x.font = fontStr; HW = {}; hcX = W / 2; hcY = H / 2;
       var t = (S.text || "").replace(/\s+/g, " ").trim() || " ";
       if (S.caseMode === "upper") t = t.toUpperCase(); else if (S.caseMode === "lower") t = t.toLowerCase();
-      var P = t + " ", L = P.length;
+      var P = t.length === 1 ? t : t + " ", L = P.length;  // one glyph repeats as a clean grid
       cw = Math.max(2, x.measureText("M").width + S.spacing); ch = Math.max(2, S.size * S.line); cols = Math.ceil(W / cw);
       var adv = {}, ax = [], ay = [], ag = [], as = [], ar = [], cx = 0, cy = S.size, row = 0, k = 0;
       while (cy < H + ch * 2 && k < 20000) {
@@ -145,7 +147,13 @@
       var INK = rgb(S.ink), GU = rgb(S.guilt);
       if (mode === "rubble") for (var p = 0; p < pile.length; p++) { var q = pile[p]; draw(q[2], q[0], q[1], q[3], 1, 1, q[4], q[0], q[1]); }
       var mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4, R2 = R * R, k8 = S.strength;
-      var pad = cw * 3, W2 = W + pad;
+      var pad = cw * 3, W2 = W + pad, curW = S.weight, HS = null;
+      if (mode === "heat") {                  // heat: field follows the pointer, wanders when there is none
+        var htx = mouse.on ? mouse.x : W * (.5 + .32 * Math.sin(sec * .37)), hty = mouse.on ? mouse.y : H * (.5 + .3 * Math.sin(sec * .53 + 1));
+        hcX += (htx - hcX) * (mouse.on ? .35 : .05); hcY += (hty - hcY) * (mouse.on ? .35 : .05);
+        HS = [INK].concat(PALETTES[S.palette] ? (palCache[S.palette] || (palCache[S.palette] = PALETTES[S.palette].map(rgb)))
+          : [hslRgb(200, 90, 60), hslRgb(120, 80, 55), hslRgb(55, 95, 58), hslRgb(25, 100, 55), hslRgb(0, 100, 50)]);
+      }
 
       for (i = 0; i < N; i++) {
         var c = G[i], row = grow[i], s = gs[i], hx = gx[i], hy = gy[i];
@@ -173,6 +181,12 @@
               state[i] = 2; born[i] = sec;
             } else draw(c, fx[i], fy[i], fr[i], .6, 1, s, fx[i], fy[i]);
           } else if (sec - born[i] > S.regrow) { state[i] = 0; born[i] = sec; }
+          continue;
+        }
+        if (mode === "heat") {
+          if (c === " ") continue;
+          var tq = Math.max(0, 1 - Math.hypot(hx + cw * .3 - hcX, hy - S.size * .35 * s - hcY) / R); tq = tq * tq * (3 - 2 * tq);
+          fx[i] += (tq - fx[i]) * (dt ? .16 : 1); heatGlyph(c, hx, hy, fx[i], s);
           continue;
         }
 
@@ -219,6 +233,15 @@
       }
       x.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+      function heatGlyph(c, X, Y, t, s) {
+        var wq = Math.round((S.weight + (900 - S.weight) * Math.min(1, t * S.strength)) / 25) * 25;
+        var w0 = HW[c + "|" + S.weight];
+        if (w0 === undefined) { x.font = fontStr; curW = S.weight; w0 = HW[c + "|" + S.weight] = x.measureText(c).width; }
+        if (wq !== curW) { x.font = wq + " " + S.size + "px " + FONTS[S.font]; curW = wq; }
+        var w1 = HW[c + "|" + wq]; if (w1 === undefined) w1 = HW[c + "|" + wq] = x.measureText(c).width;
+        var n = HS.length - 1, f = Math.min(n - 1e-6, Math.max(0, t) * n), k = Math.floor(f), u = f - k, a = HS[k], b = HS[k + 1];
+        drawRaw(c, X + (w0 - w1) / 2 * s, Y, 0, s, "rgb(" + ((a[0] + (b[0] - a[0]) * u) | 0) + "," + ((a[1] + (b[1] - a[1]) * u) | 0) + "," + ((a[2] + (b[2] - a[2]) * u) | 0) + ")");
+      }
       function spinOf(j) { return S.spin ? Math.sin(sec * 1.7 + j * .73) * Math.PI * S.spin : 0; }
       function draw(ch_, X, Y, ang, h, a, sc, cx, cy) {
         var col = INK;
