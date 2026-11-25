@@ -28,7 +28,6 @@
   #mVid .dot{width:13px;height:13px;border-radius:50%;background:#ff3b3b;box-shadow:0 0 0 2px #14181d,0 0 0 3.5px #cfd4dacc}
   @media (max-width:480px),(pointer:coarse){.mb{display:grid}body.open .mb{display:none}}
   body.open #toggle .i-open,body:not(.open) #toggle .i-close{display:none}
-  @media (min-width:481px){body.open #miniRandom{display:none}}
   #rec{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);display:none;z-index:6;
     font:600 12px ui-monospace,Menlo,monospace;color:#fff;background:#d0202ecc;padding:7px 12px;white-space:nowrap;border-radius:16px;border:0;min-height:0!important}
   body.recording #rec{display:block}
@@ -39,7 +38,7 @@
   #done[hidden]{display:none}#done video{width:100%;max-height:40vh;border-radius:6px;background:#000;margin-bottom:8px}
   #done .btns{margin-top:6px}
   #fontFile{display:none}
-  #panel{position:fixed;top:12px;left:12px;width:min(272px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;
+  #panel{position:fixed;top:56px;right:12px;width:min(272px,calc(100vw - 24px));max-height:calc(100vh - 68px);overflow:auto;
     background:#14181dee;color:#cfd4da;font:12px/1.3 ui-monospace,Menlo,monospace;border:1px solid #3a424d;
     border-radius:10px;padding:10px 12px;box-sizing:border-box;cursor:auto;backdrop-filter:blur(6px)}
   #panel.hidden{display:none}
@@ -50,7 +49,7 @@
   #panel summary::after{content:"+"}#panel details[open] summary::after{content:"−"}
   #recBtn{width:100%;margin-top:6px;padding:9px;font-weight:700;color:#fff;background:#b3202c;border-color:#d0202e}
   @media (pointer:coarse){select,input[type=text],textarea{font-size:16px}button{min-height:44px}input[type=range]{height:32px}}
-  @media (max-width:480px){#panel{top:auto;bottom:0;left:0;width:100vw;max-height:60dvh;border-radius:14px 14px 0 0;border-width:1px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+  @media (max-width:480px){#panel{top:auto;bottom:0;left:0;right:auto;width:100vw;max-height:60dvh;border-radius:14px 14px 0 0;border-width:1px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom))}
     #hud{right:auto;left:50%;transform:translateX(-50%);bottom:auto;top:max(18px,calc(env(safe-area-inset-top) + 8px))}}
   .row{display:grid;grid-template-columns:86px 1fr 38px;align-items:center;gap:6px;margin:4px 0}
   .row span.v{text-align:right;color:#8a929c}
@@ -123,6 +122,9 @@
     ripple:   { label: "Ripple", note: "Click or tap: rings push the letters.", radius: 90, strength: 1, spring: .02, damping: .88 },
     explode:  { label: "Explode", note: "Click or tap: letters blow apart and come back.", radius: 280, strength: 1, spring: .006, damping: .94 },
     heat:     { label: "Heat", note: "Letters near the cursor get bolder and hotter. Set weight low for the full range.", radius: 420, strength: 1, spring: .02, damping: .86 },
+    grow:     { label: "Grow", note: "Glyph wall: letters swell as you come near. Try many different glyphs.", radius: 220, strength: 1, spring: .02, damping: .86 },
+    poster:   { label: "Poster", note: "One big word along the edge, turned 90°. Push it around.", radius: 260, strength: 1.2, spring: .02, damping: .86 },
+    stack:    { label: "Stack", note: "The word repeats in sliced strips that follow the cursor.", radius: 150, strength: 1, spring: .02, damping: .86 },
     none:     { label: "Just motion", note: "No cursor effect. Only the motion extras.", radius: 150, strength: 1, spring: .02, damping: .86 }
   };
   var FONTS = {
@@ -138,7 +140,7 @@
     text: "HELLO WORLD!", effect: "lookaway", font: "mono", size: 15, weight: 600, line: 1.55, spacing: 0,
     sizeMix: 0, caseMode: "upper", seed: 1,
     radius: 150, strength: 1, spring: .015, damping: .86, tilt: 0, regrow: 6, gravity: .45, pileMax: .5, calm: 2.5,
-    guiltRate: 1, jitter: 0, wave: 0, breathe: 0, spin: 0, slide: 0, glitch: 0, trail: 0,
+    guiltRate: 1, jitter: 0, wave: 0, breathe: 0, spin: 0, slide: 0, glitch: 0, trail: 0, widen: 0, reveal: 0,
     flow: 0, flowSpeed: .5, palette: "rainbow", blobs: 0, bg: "#2b313a", ink: "#cdd2d8", guilt: "#ff4637", counter: 0, ring: 1
   };
   var CONTROLS = [
@@ -153,11 +155,13 @@
     ["range", "spring", "return", 0, .08, .001], ["range", "damping", "damping", .6, .99, .01],
     ["range", "regrow", "regrow s", 1, 30, .5, "rubble"], ["range", "gravity", "gravity", .05, 1.5, .05, "rubble"],
     ["range", "pileMax", "pile max", .1, .9, .05, "rubble"], ["range", "calm", "calm s", .5, 10, .5, "closing"],
+    ["range", "widen", "widen", 0, 1, .05, "heat"],
     ["h", "Motion"],
     ["range", "slide", "rows slide", 0, 3, .05], ["range", "wave", "drift wave", 0, 1.5, .02],
     ["range", "spin", "spin", 0, 1, .02], ["range", "tilt", "tilt", 0, 1, .05],
     ["range", "jitter", "shiver", 0, 1, .02], ["range", "breathe", "breathe", 0, 1, .02],
     ["range", "glitch", "glitch", 0, 1, .02], ["range", "trail", "afterimage", 0, .97, .01],
+    ["range", "reveal", "reveal in s", 0, 4, .1],
     ["h", "Colour"],
     ["select", "palette", "palette", ["rainbow", "sunset", "electric", "mint", "ember", "ocean", "mono", "heat"]],
     ["range", "flow", "colour flow", 0, 1, .02], ["range", "flowSpeed", "flow speed", 0, 3, .05],
@@ -181,7 +185,7 @@
   effectEl.onchange = function () {
     var e = EFFECTS[effectEl.value]; S.effect = effectEl.value;
     ["radius", "strength", "spring", "damping"].forEach(function (k) { S[k] = e[k]; });
-    resetPhysics(); buildUI(); save();
+    setup(); buildUI(); save();           // poster and stack need a new layout
   };
   textEl.oninput = function () { S.text = textEl.value; setup(); save(); };
 
@@ -196,7 +200,7 @@
         sect.ontoggle = function () { closed[nm] = !this.open; lsSet("typefun-closed", closed); };
         ctl.appendChild(sect); return;
       }
-      if (c[0] === "range" && c[6] && c[6] !== S.effect) return;
+      if (c[0] === "range" && c[6] && c[6].split("|").indexOf(S.effect) < 0) return;
       var row = document.createElement("label"); row.className = "row" + (c[0] === "range" ? "" : " wide");
       var lab = c[2]; if (c[1] === "radius" && S.effect === "ripple") lab = "ring width";
       row.innerHTML = "<span>" + lab + "</span>"; var input, val;
@@ -243,7 +247,23 @@
       var z = Math.round(Math.max(36, Math.min(120, innerWidth / 16)));
       return { text: "a", effect: "heat", font: "system", size: z, weight: 100, line: .92, spacing: Math.round(z * .3), caseMode: "as typed",
         radius: Math.round(Math.max(innerWidth, innerHeight) * .3), strength: 1, spring: .02, damping: .86, palette: "heat",
-        bg: "#1b1c20", ink: "#1020ff", guilt: "#ff1500", guiltRate: 0, flow: 0, blobs: 0, ring: 0, counter: 0, seed: 1 };
+        bg: "#1b1c20", ink: "#1020ff", guilt: "#ff1500", guiltRate: 0, flow: 0, blobs: 0, ring: 0, counter: 0, seed: 1, widen: .5 };
+    } },
+    { name: "Glyph wall", s: function () {
+      var z = Math.round(Math.max(22, Math.min(60, innerWidth / 22)));
+      return { text: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789&?!@#%*+=", effect: "grow", font: "helvetica", size: z, weight: 700, line: 1.25,
+        spacing: Math.round(z * .35), caseMode: "upper", radius: Math.round(Math.max(innerWidth, innerHeight) * .16), strength: 1, spring: .02, damping: .86,
+        bg: "#efeee8", ink: "#1b1c20", guilt: "#ff4a1c", guiltRate: 0, flow: 0, blobs: 0, ring: 0, counter: 0, seed: 1 };
+    } },
+    { name: "Poster", s: function () {
+      return { text: "Fun", effect: "poster", font: "system", size: 100, weight: 800, line: 1, spacing: -4, caseMode: "as typed",
+        radius: 260, strength: 1.2, spring: .02, damping: .86, tilt: .6, bg: "#f0662e", ink: "#efeee8", guilt: "#1b1c20",
+        guiltRate: 0, flow: 0, blobs: 0, ring: 0, counter: 0, seed: 1, reveal: 1.2 };
+    } },
+    { name: "Stack · 28", s: function () {
+      return { text: "28", effect: "stack", font: "system", size: 100, weight: 800, line: 1, spacing: 0, caseMode: "as typed",
+        radius: 150, strength: 1, spring: .02, damping: .86, bg: "#1b1c20", ink: "#efeee8", guilt: "#f0662e",
+        guiltRate: 1, flow: 0, blobs: 0, ring: 0, counter: 0, seed: 1, reveal: 1.5 };
     } }
   ];
   function buildFavs(sel) {
@@ -289,7 +309,7 @@
     var sp = pick(["tight", "none", "none", "loose", "wide", "huge"]);
     n.spacing = +({ tight: -r(.05, .3) * n.size, none: 0, loose: r(.05, .3) * n.size, wide: r(.3, 1) * n.size, huge: r(1, 2.5) * n.size }[sp]).toFixed(1);
     n.spacing = Math.max(-40, Math.min(240, n.spacing));
-    n.sizeMix = chance(.4) ? +r(.2, 1.3).toFixed(2) : 0;
+    n.sizeMix = S.sizeMix; n.reveal = S.reveal; n.widen = chance(.5) ? +r(.3, 1).toFixed(2) : 0;  // size chaos stays where you set it
     n.weight = pick([100, 300, 400, 600, 800, 900]);
     n.slide = chance(.3) ? +r(.2, 2).toFixed(2) : 0; n.wave = chance(.3) ? +r(.2, 1).toFixed(2) : 0;
     n.spin = chance(.2) ? +r(.1, .8).toFixed(2) : 0; n.tilt = chance(.4) ? +r(.3, 1).toFixed(2) : 0;
@@ -423,7 +443,7 @@
       "",
       "```json", pretty, "```",
       "",
-      "Key params: `effect` lookaway|swirl|magnet|closing|rubble|ripple|explode|heat|none · `radius` px of cursor reach · `strength` force · `spring` return speed · `damping` 0.6–0.99 · motion extras `slide wave spin tilt jitter breathe glitch trail` (0 = off) · `flow` 0–1 palette colour mix · `blobs` 0–1 floating colour light · `guiltRate` how often accent-coloured runs appear (0 = never)."
+      "Key params: `effect` lookaway|swirl|magnet|closing|rubble|ripple|explode|heat|grow|poster|stack|none · `radius` px of cursor reach · `strength` force · `spring` return speed · `damping` 0.6–0.99 · motion extras `slide wave spin tilt jitter breathe glitch trail` (0 = off) · `widen` 0–1 width change in Heat · `reveal` seconds of the intro (0 = off) · `flow` 0–1 palette colour mix · `blobs` 0–1 floating colour light · `guiltRate` how often accent-coloured runs appear (0 = never)."
     ].filter(function (l) { return l !== null; }).join("\n");
   }
   $("aiCopy").onclick = function () {
@@ -447,7 +467,7 @@
   var cv = $("c"), x = cv.getContext("2d"), hud = $("hud");
   var dpr, W, H, cw, ch, cols, N = 0, G, gs, grow, gx, gy, ox, oy, vx, vy, rot, vr, heat, state, born, fx, fy, fvx, fvy, fr, fvr, pile, heights, fontStr;
   var mouse = { x: -1e4, y: -1e4, on: false }, taps = [], prev = performance.now(), sec = 0, nextHeat = 0;
-  var busy = 0, still = 0, lastX = 0, lastY = 0, fallen = 0, rowGlitch = [], hcX = 0, hcY = 0, HW = {};
+  var busy = 0, still = 0, lastX = 0, lastY = 0, fallen = 0, rowGlitch = [], hcX = 0, hcY = 0, HW = {}, gcx, gcy, baseAng = 0, stk = null, revealT0 = 0, big = [];
   function rnd(i) { var v = Math.sin((i + S.seed * 7.31) * 12.9898) * 43758.5453; return v - Math.floor(v); }
 
   var offX = 0, offY = 0, rec = null;          // rec: {w,h} output pixels while recording a video
@@ -479,14 +499,33 @@
     }
     N = ax.length; G = ag; gs = Float32Array.from(as); grow = Int16Array.from(ar);
     gx = Float32Array.from(ax); gy = Float32Array.from(ay);
-    resetPhysics();
+    layoutSpecial(t); resetPhysics();
+  }
+  function layoutSpecial(t) {             // poster + stack lay the word out themselves; others keep the stream
+    gcx = new Float32Array(N); gcy = new Float32Array(N).fill(-S.size * .35); baseAng = 0; stk = null;
+    var word = t.slice(0, 14), k;
+    if (S.effect === "poster") {           // one big word turned 90°, along the right edge
+      var ws = 0, aw = []; for (k = 0; k < word.length; k++) { aw.push(x.measureText(word[k]).width + S.spacing); ws += aw[k]; }
+      var f = Math.min(H * .9 / Math.max(1, ws), W * .82 / (S.size * .74)), m = Math.min(W, H) * .04;
+      fontStr = S.weight + " " + (S.size * f) + "px " + FONTS[S.font]; x.font = fontStr;
+      var y = H - (H - ws * f) / 2; N = word.length; G = word.split(""); gs = new Float32Array(N).fill(1); grow = new Int16Array(N);
+      gx = new Float32Array(N); gy = new Float32Array(N); gcx = new Float32Array(N); gcy = new Float32Array(N);
+      for (k = 0; k < N; k++) { gx[k] = W - m; gy[k] = y; grow[k] = k; gcx[k] = -S.size * f * .38; gcy[k] = -aw[k] * f / 2; y -= aw[k] * f; }
+      baseAng = -Math.PI / 2;
+    } else if (S.effect === "stack") {     // big word on top, then sliced strips of its lower part
+      var wd = x.measureText(word).width, fs = S.size * Math.min(W * .9 / Math.max(1, wd), H * .42 / (S.size * .74));
+      fontStr = S.weight + " " + fs + "px " + FONTS[S.font]; x.font = fontStr;
+      var ww = x.measureText(word).width, y0 = Math.min(W, H) * .05 + fs * .74, band = fs * .26, yy = y0 + fs * .06, hk = band * .9, strips = [];
+      while (yy < H && strips.length < 60) { strips.push([yy, hk]); yy += hk + Math.max(1, fs * .015); hk = Math.max(3, hk * .86); }
+      stk = { word: word, x: (W - ww) / 2, y0: y0, band: band, strips: strips, off: new Float32Array(strips.length) };
+    }
   }
   function resetPhysics() {
     ox = new Float32Array(N); oy = new Float32Array(N); vx = new Float32Array(N); vy = new Float32Array(N);
     rot = new Float32Array(N); vr = new Float32Array(N); heat = new Float32Array(N); state = new Uint8Array(N);
     born = new Float32Array(N).fill(-99); fx = new Float32Array(N); fy = new Float32Array(N); fvx = new Float32Array(N);
     fvy = new Float32Array(N); fr = new Float32Array(N); fvr = new Float32Array(N); pile = []; heights = new Float32Array(cols + 2);
-    fallen = 0; still = 0; busy = 0; taps = []; rowGlitch = [];
+    fallen = 0; still = 0; busy = 0; taps = []; rowGlitch = []; revealT0 = sec;
   }
   addEventListener("resize", function () { if (!rec) setup(); });
   function move(e) { if (e.target !== cv) return; mouse.x = e.clientX - offX; mouse.y = e.clientY - offY; mouse.on = true; }
@@ -567,14 +606,15 @@
     var breathe = 1 + Math.sin(sec * 1.3) * .15 * S.breathe, pad = cw * 3, W2 = W + pad;
     // heat: field centre follows the pointer; with no pointer it wanders by itself
     var curW = S.weight, HS = null;
-    if (mode === "heat") {
+    if (mode === "heat" || mode === "grow") {
       var htx = mouse.on ? mouse.x : W * (.5 + .32 * Math.sin(sec * .37)), hty = mouse.on ? mouse.y : H * (.5 + .3 * Math.sin(sec * .53 + 1));
       hcX += (htx - hcX) * (mouse.on ? .35 : .05); hcY += (hty - hcY) * (mouse.on ? .35 : .05);
       HS = [INK].concat(PALETTES[S.palette] ? (palCache[S.palette] || (palCache[S.palette] = PALETTES[S.palette].map(rgb)))
         : [hslRgb(200, 90, 60), hslRgb(120, 80, 55), hslRgb(55, 95, 58), hslRgb(25, 100, 55), hslRgb(0, 100, 50)]);
     }
 
-    for (i = 0; i < N; i++) {
+    big = []; var rowsN = N ? grow[N - 1] + 1 : 1;
+    for (i = 0; i < (mode === "stack" ? 0 : N); i++) {
       var c = G[i], row = grow[i], s = gs[i];
       // home position after the motion extras
       var hx = gx[i], hy = gy[i];
@@ -582,6 +622,13 @@
       if (S.wave) { hx += Math.sin(gy[i] * .02 + sec * 1.1) * 14 * S.wave; hy += Math.cos(gx[i] * .015 + sec * .8) * 9 * S.wave; }
       if (gOff[row]) hx += gOff[row];
       if (S.breathe) s *= 1 + Math.sin(sec * 2 + i * .21) * .25 * S.breathe;
+      var ap = 1;
+      if (S.reveal > 0) {                      // reveal: rows fade and rise in, one after another
+        ap = (sec - revealT0 - row / rowsN * S.reveal) / .6;
+        if (ap <= 0) continue;
+        if (ap < 1) { ap = ap * ap * (3 - 2 * ap); hy += (1 - ap) * S.size * .8; } else ap = 1;
+        x.globalAlpha = ap;
+      }
 
       if (mode === "rubble") {
         if (state[i] === 0) {
@@ -604,6 +651,13 @@
         } else if (sec - born[i] > S.regrow) { state[i] = 0; born[i] = sec; }
         continue;
       }
+      if (mode === "grow") {                  // glyph wall: letters swell near the pointer, biggest drawn last
+        if (c === " ") continue;
+        var tg = Math.max(0, 1 - Math.hypot(hx + cw * .3 - hcX, hy - S.size * .35 * s - hcY) / R); tg = tg * tg * (3 - 2 * tg);
+        fx[i] += (tg - fx[i]) * (dt ? .16 : 1);
+        if (fx[i] > .02) big.push([i, hx, hy, s, fx[i], ap, c]); else draw(c, hx, hy, 0, heat[i], 1, s, hx, hy);
+        continue;
+      }
       if (mode === "heat") {
         if (c === " ") continue;
         var tq = Math.max(0, 1 - Math.hypot(hx + cw * .3 - hcX, hy - S.size * .35 * s - hcY) / R); tq = tq * tq * (3 - 2 * tq);
@@ -611,7 +665,7 @@
         continue;
       }
 
-      var px = hx + ox[i], py = hy - S.size * .35 * s + oy[i];
+      var px = hx + gcx[i] + ox[i], py = hy + gcy[i] * s + oy[i];
       var dx = px - mx, dy = py - my, d = Math.sqrt(dx * dx + dy * dy) + .001, RR = R;
       if (mode !== "ripple" && mode !== "explode" && mode !== "none" && d < RR) {
         var f = 1 - d / RR; f = f * f;
@@ -646,7 +700,7 @@
         h = Math.max(h, Math.min(1, pull * near * 1.6 + Math.max(0, still - S.calm) / 30 * .3));
         if (h > .3) sc *= 1 + (h - .3) * .5;
       }
-      var ang = rot[i] + spinOf(i) + (S.tilt && off > .05 ? Math.atan2(vy[i], vx[i]) * off * S.tilt : 0);
+      var ang = baseAng + rot[i] + spinOf(i) + (S.tilt && off > .05 ? Math.atan2(vy[i], vx[i]) * off * S.tilt : 0);
       var X = hx + ox[i], Y = hy + oy[i];
       if (gOff[row] && S.glitch) {             // chromatic ghost on glitched rows
         x.globalCompositeOperation = "lighter";
@@ -655,9 +709,43 @@
       }
       draw(c, X, Y, ang, h, alpha, sc, X, Y);
     }
+    x.globalAlpha = 1;
+    if (big.length) { big.sort(function (a, b) { return a[4] - b[4]; }); for (var bi = 0; bi < big.length; bi++) growGlyph(big[bi]); }
+    if (mode === "stack") stackDraw();
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (mouse.on && S.ring) { x.strokeStyle = S.ink; x.globalAlpha = .6; x.lineWidth = 1; x.beginPath(); x.arc(mouse.x, mouse.y, 4, 0, 7); x.stroke(); x.globalAlpha = 1; }
 
+    function wideRaw(c, X, Y, s, w0, w1, t, style) {   // width axis: far letters narrow, near letters wide
+      var sx = S.widen ? 1 + (Math.min(1, t) - .5) * .9 * S.widen : 1;
+      if (sx === 1) return drawRaw(c, X + (w0 - w1) / 2 * s, Y, 0, s, style);
+      if (style !== lastStyle) { x.fillStyle = style; lastStyle = style; }
+      x.setTransform(sx * s * dpr, 0, 0, s * dpr, (X + (w0 - w1 * sx) / 2 * s) * dpr, Y * dpr); x.fillText(c, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function growGlyph(b) {
+      var c = b[6], t = b[4], s = b[3], sc = s * (1 + t * 1.3 * S.strength), w = HW[c] || (HW[c] = x.measureText(c).width);
+      x.globalAlpha = b[5];
+      draw(c, b[1] - w * (sc - s) / 2, b[2] + S.size * .35 * (sc - s), 0, Math.max(heat[b[0]], t), 1, sc, b[1], b[2]);
+      x.globalAlpha = 1;
+    }
+    function stackDraw() {
+      if (!stk) return;
+      var K = stk.strips.length, k, tgt = mouse.on ? (mouse.x - W / 2) * .6 * S.strength : Math.sin(sec * .9) * W * .06 * S.strength;
+      stk.off[0] += (tgt - stk.off[0]) * (dt ? .25 : 1);
+      for (k = 1; k < K; k++) stk.off[k] += (stk.off[k - 1] - stk.off[k]) * (dt ? .3 : 1);
+      function al(k) { return S.reveal > 0 ? Math.max(0, Math.min(1, (sec - revealT0 - (k + 1) / (K + 1) * S.reveal) / .6)) : 1; }
+      x.globalAlpha = al(-1); if (x.globalAlpha > 0) draw(stk.word, stk.x, stk.y0, 0, 0, 1, 1, stk.x, stk.y0);
+      for (k = 0; k < K; k++) {
+        var a = al(k); if (a <= 0) continue;
+        var st = stk.strips[k], sy = st[1] / stk.band, ty = st[0] - (stk.y0 - stk.band) * sy, col = INK;
+        if (S.flow > 0) { var fc = palette(k / K * .6 + sec * S.flowSpeed * .17); col = [INK[0] + (fc[0] - INK[0]) * S.flow, INK[1] + (fc[1] - INK[1]) * S.flow, INK[2] + (fc[2] - INK[2]) * S.flow]; }
+        var h = Math.min(1, Math.abs(stk.off[k]) / (W * .4)) * Math.min(1, S.guiltRate);
+        x.save(); x.globalAlpha = a; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.beginPath(); x.rect(0, st[0], W, st[1] + .5); x.clip();
+        x.setTransform(dpr, 0, 0, dpr * sy, (stk.x + stk.off[k]) * dpr, ty * dpr);
+        x.fillStyle = "rgb(" + ((col[0] + (GU[0] - col[0]) * h) | 0) + "," + ((col[1] + (GU[1] - col[1]) * h) | 0) + "," + ((col[2] + (GU[2] - col[2]) * h) | 0) + ")";
+        x.fillText(stk.word, 0, stk.y0); x.restore(); lastStyle = "";
+      }
+      x.globalAlpha = 1; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     function spinOf(j) { return S.spin ? Math.sin(sec * 1.7 + j * .73) * Math.PI * S.spin : 0; }
     function heatGlyph(c, X, Y, t, s) {      // weight + colour from the heat field; glyph stays centred in its cell
       var wq = Math.round((S.weight + (900 - S.weight) * Math.min(1, t * S.strength)) / 25) * 25, fw = function (w) { return w + " " + S.size + "px " + FONTS[S.font]; };
@@ -666,7 +754,7 @@
       if (wq !== curW) { x.font = fw(wq); curW = wq; }
       var w1 = HW[c + "|" + wq]; if (w1 === undefined) w1 = HW[c + "|" + wq] = x.measureText(c).width;
       var n = HS.length - 1, f = Math.min(n - 1e-6, Math.max(0, t) * n), k = Math.floor(f), u = f - k, a = HS[k], b = HS[k + 1];
-      drawRaw(c, X + (w0 - w1) / 2 * s, Y, 0, s, "rgb(" + ((a[0] + (b[0] - a[0]) * u) | 0) + "," + ((a[1] + (b[1] - a[1]) * u) | 0) + "," + ((a[2] + (b[2] - a[2]) * u) | 0) + ")");
+      wideRaw(c, X, Y, s, w0, w1, t, "rgb(" + ((a[0] + (b[0] - a[0]) * u) | 0) + "," + ((a[1] + (b[1] - a[1]) * u) | 0) + "," + ((a[2] + (b[2] - a[2]) * u) | 0) + ")");
     }
     function draw(ch_, X, Y, ang, h, a, sc, cx, cy) {
       var col = INK;
@@ -682,7 +770,7 @@
   function drawRaw(c, X, Y, ang, sc, style) {
     if (style !== lastStyle) { x.fillStyle = style; lastStyle = style; }
     // snap scale/angle to steps so the browser can reuse cached glyphs (free-floating values kill the glyph cache)
-    sc = Math.round(sc * 16) / 16; ang = Math.round(ang * 24) / 24;
+    sc = Math.round(sc * 16) / 16; ang = Math.round((ang - baseAng) * 24) / 24 + baseAng;
     if (ang || sc !== 1) { var co = Math.cos(ang) * sc * dpr, si = Math.sin(ang) * sc * dpr; x.setTransform(co, si, -si, co, X * dpr, Y * dpr); x.fillText(c, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0); }
     else x.fillText(c, X, Y);
   }

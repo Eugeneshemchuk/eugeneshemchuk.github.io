@@ -17,7 +17,7 @@
     text: "HELLO WORLD!", effect: "lookaway", font: "mono", size: 15, weight: 600, line: 1.55, spacing: 0,
     sizeMix: 0, caseMode: "upper", seed: 1,
     radius: 150, strength: 1, spring: .015, damping: .86, tilt: 0, regrow: 6, gravity: .45, pileMax: .5, calm: 2.5,
-    guiltRate: 1, jitter: 0, wave: 0, breathe: 0, spin: 0, slide: 0, glitch: 0, trail: 0,
+    guiltRate: 1, jitter: 0, wave: 0, breathe: 0, spin: 0, slide: 0, glitch: 0, trail: 0, widen: 0, reveal: 0,
     flow: 0, flowSpeed: .5, palette: "rainbow", blobs: 0, bg: "#2b313a", ink: "#cdd2d8", guilt: "#ff4637"
   };
   var PALETTES = {
@@ -50,7 +50,7 @@
     }
     var dpr, W, H, cw, ch, cols, N = 0, G, gs, grow, gx, gy, ox, oy, vx, vy, rot, vr, heat, state, born, fx, fy, fvx, fvy, fr, fvr, pile, heights, fontStr;
     var mouse = { x: -1e4, y: -1e4, on: false }, taps = [], prev = performance.now(), sec = 0, nextHeat = 0;
-    var busy = 0, still = 0, lastX = 0, lastY = 0, rowGlitch = [], lastStyle = "", hcX = 0, hcY = 0, HW = {};
+    var busy = 0, still = 0, lastX = 0, lastY = 0, rowGlitch = [], lastStyle = "", hcX = 0, hcY = 0, HW = {}, gcx, gcy, baseAng = 0, stk = null, revealT0 = 0, big = [];
     function rnd(i) { var v = Math.sin((i + S.seed * 7.31) * 12.9898) * 43758.5453; return v - Math.floor(v); }
 
     function setup() {
@@ -73,14 +73,33 @@
         ax.push(cx); ay.push(cy); ag.push(c); as.push(s); ar.push(row); cx += w; k++;
       }
       N = ax.length; G = ag; gs = Float32Array.from(as); grow = Int16Array.from(ar); gx = Float32Array.from(ax); gy = Float32Array.from(ay);
-      resetPhysics(); if (reduced) render(0);
+      layoutSpecial(t); resetPhysics(); if (reduced) render(0);
+    }
+    function layoutSpecial(t) {             // poster + stack lay the word out themselves; others keep the stream
+      gcx = new Float32Array(N); gcy = new Float32Array(N).fill(-S.size * .35); baseAng = 0; stk = null;
+      var word = t.slice(0, 14), k;
+      if (S.effect === "poster") {           // one big word turned 90°, along the right edge
+        var ws = 0, aw = []; for (k = 0; k < word.length; k++) { aw.push(x.measureText(word[k]).width + S.spacing); ws += aw[k]; }
+        var f = Math.min(H * .9 / Math.max(1, ws), W * .82 / (S.size * .74)), m = Math.min(W, H) * .04;
+        fontStr = S.weight + " " + (S.size * f) + "px " + FONTS[S.font]; x.font = fontStr;
+        var y = H - (H - ws * f) / 2; N = word.length; G = word.split(""); gs = new Float32Array(N).fill(1); grow = new Int16Array(N);
+        gx = new Float32Array(N); gy = new Float32Array(N); gcx = new Float32Array(N); gcy = new Float32Array(N);
+        for (k = 0; k < N; k++) { gx[k] = W - m; gy[k] = y; grow[k] = k; gcx[k] = -S.size * f * .38; gcy[k] = -aw[k] * f / 2; y -= aw[k] * f; }
+        baseAng = -Math.PI / 2;
+      } else if (S.effect === "stack") {     // big word on top, then sliced strips of its lower part
+        var wd = x.measureText(word).width, fs = S.size * Math.min(W * .9 / Math.max(1, wd), H * .42 / (S.size * .74));
+        fontStr = S.weight + " " + fs + "px " + FONTS[S.font]; x.font = fontStr;
+        var ww = x.measureText(word).width, y0 = Math.min(W, H) * .05 + fs * .74, band = fs * .26, yy = y0 + fs * .06, hk = band * .9, strips = [];
+        while (yy < H && strips.length < 60) { strips.push([yy, hk]); yy += hk + Math.max(1, fs * .015); hk = Math.max(3, hk * .86); }
+        stk = { word: word, x: (W - ww) / 2, y0: y0, band: band, strips: strips, off: new Float32Array(strips.length) };
+      }
     }
     function resetPhysics() {
       ox = new Float32Array(N); oy = new Float32Array(N); vx = new Float32Array(N); vy = new Float32Array(N);
       rot = new Float32Array(N); vr = new Float32Array(N); heat = new Float32Array(N); state = new Uint8Array(N);
       born = new Float32Array(N).fill(-99); fx = new Float32Array(N); fy = new Float32Array(N); fvx = new Float32Array(N);
       fvy = new Float32Array(N); fr = new Float32Array(N); fvr = new Float32Array(N); pile = []; heights = new Float32Array(cols + 2);
-      still = 0; busy = 0; taps = []; rowGlitch = [];
+      still = 0; busy = 0; taps = []; rowGlitch = []; revealT0 = sec;
     }
     function local(e) {
       var b = cv.getBoundingClientRect(), px = e.clientX - b.left, py = e.clientY - b.top;
@@ -148,19 +167,27 @@
       if (mode === "rubble") for (var p = 0; p < pile.length; p++) { var q = pile[p]; draw(q[2], q[0], q[1], q[3], 1, 1, q[4], q[0], q[1]); }
       var mx = mouse.on ? mouse.x : -1e4, my = mouse.on ? mouse.y : -1e4, R2 = R * R, k8 = S.strength;
       var pad = cw * 3, W2 = W + pad, curW = S.weight, HS = null;
-      if (mode === "heat") {                  // heat: field follows the pointer, wanders when there is none
+      if (mode === "heat" || mode === "grow") {                  // heat: field follows the pointer, wanders when there is none
         var htx = mouse.on ? mouse.x : W * (.5 + .32 * Math.sin(sec * .37)), hty = mouse.on ? mouse.y : H * (.5 + .3 * Math.sin(sec * .53 + 1));
         hcX += (htx - hcX) * (mouse.on ? .35 : .05); hcY += (hty - hcY) * (mouse.on ? .35 : .05);
         HS = [INK].concat(PALETTES[S.palette] ? (palCache[S.palette] || (palCache[S.palette] = PALETTES[S.palette].map(rgb)))
           : [hslRgb(200, 90, 60), hslRgb(120, 80, 55), hslRgb(55, 95, 58), hslRgb(25, 100, 55), hslRgb(0, 100, 50)]);
       }
 
-      for (i = 0; i < N; i++) {
+      big = []; var rowsN = N ? grow[N - 1] + 1 : 1;
+      for (i = 0; i < (mode === "stack" ? 0 : N); i++) {
         var c = G[i], row = grow[i], s = gs[i], hx = gx[i], hy = gy[i];
         if (S.slide) { var dir = row % 2 ? 1 : -1; hx = ((hx + dir * S.slide * 40 * sec * (1 + (row % 3) * .35) + pad) % W2 + W2) % W2 - pad; }
         if (S.wave) { hx += Math.sin(gy[i] * .02 + sec * 1.1) * 14 * S.wave; hy += Math.cos(gx[i] * .015 + sec * .8) * 9 * S.wave; }
         if (gOff[row]) hx += gOff[row];
         if (S.breathe) s *= 1 + Math.sin(sec * 2 + i * .21) * .25 * S.breathe;
+        var ap = 1;
+        if (S.reveal > 0) {                      // reveal: rows fade and rise in, one after another
+          ap = (sec - revealT0 - row / rowsN * S.reveal) / .6;
+          if (ap <= 0) continue;
+          if (ap < 1) { ap = ap * ap * (3 - 2 * ap); hy += (1 - ap) * S.size * .8; } else ap = 1;
+          x.globalAlpha = ap;
+        }
 
         if (mode === "rubble") {
           if (state[i] === 0) {
@@ -183,6 +210,13 @@
           } else if (sec - born[i] > S.regrow) { state[i] = 0; born[i] = sec; }
           continue;
         }
+        if (mode === "grow") {                  // glyph wall: letters swell near the pointer, biggest drawn last
+          if (c === " ") continue;
+          var tg = Math.max(0, 1 - Math.hypot(hx + cw * .3 - hcX, hy - S.size * .35 * s - hcY) / R); tg = tg * tg * (3 - 2 * tg);
+          fx[i] += (tg - fx[i]) * (dt ? .16 : 1);
+          if (fx[i] > .02) big.push([i, hx, hy, s, fx[i], ap, c]); else draw(c, hx, hy, 0, heat[i], 1, s, hx, hy);
+          continue;
+        }
         if (mode === "heat") {
           if (c === " ") continue;
           var tq = Math.max(0, 1 - Math.hypot(hx + cw * .3 - hcX, hy - S.size * .35 * s - hcY) / R); tq = tq * tq * (3 - 2 * tq);
@@ -190,7 +224,7 @@
           continue;
         }
 
-        var px = hx + ox[i], py = hy - S.size * .35 * s + oy[i];
+        var px = hx + gcx[i] + ox[i], py = hy + gcy[i] * s + oy[i];
         var dx = px - mx, dy = py - my, d = Math.sqrt(dx * dx + dy * dy) + .001;
         if (mode !== "ripple" && mode !== "explode" && mode !== "none" && d < R) {
           var f = 1 - d / R; f = f * f;
@@ -222,7 +256,7 @@
           h = Math.max(h, Math.min(1, pull * near * 1.6 + Math.max(0, still - S.calm) / 30 * .3));
           if (h > .3) sc *= 1 + (h - .3) * .5;
         }
-        var ang = rot[i] + spinOf(i) + (S.tilt && off > .05 ? Math.atan2(vy[i], vx[i]) * off * S.tilt : 0);
+        var ang = baseAng + rot[i] + spinOf(i) + (S.tilt && off > .05 ? Math.atan2(vy[i], vx[i]) * off * S.tilt : 0);
         var X = hx + ox[i], Y = hy + oy[i];
         if (gOff[row] && S.glitch) {
           x.globalCompositeOperation = "lighter";
@@ -231,6 +265,9 @@
         }
         draw(c, X, Y, ang, h, alpha, sc, X, Y);
       }
+      x.globalAlpha = 1;
+      if (big.length) { big.sort(function (a, b) { return a[4] - b[4]; }); for (var bi = 0; bi < big.length; bi++) growGlyph(big[bi]); }
+      if (mode === "stack") stackDraw();
       x.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       function heatGlyph(c, X, Y, t, s) {
@@ -240,7 +277,38 @@
         if (wq !== curW) { x.font = wq + " " + S.size + "px " + FONTS[S.font]; curW = wq; }
         var w1 = HW[c + "|" + wq]; if (w1 === undefined) w1 = HW[c + "|" + wq] = x.measureText(c).width;
         var n = HS.length - 1, f = Math.min(n - 1e-6, Math.max(0, t) * n), k = Math.floor(f), u = f - k, a = HS[k], b = HS[k + 1];
-        drawRaw(c, X + (w0 - w1) / 2 * s, Y, 0, s, "rgb(" + ((a[0] + (b[0] - a[0]) * u) | 0) + "," + ((a[1] + (b[1] - a[1]) * u) | 0) + "," + ((a[2] + (b[2] - a[2]) * u) | 0) + ")");
+        wideRaw(c, X, Y, s, w0, w1, t, "rgb(" + ((a[0] + (b[0] - a[0]) * u) | 0) + "," + ((a[1] + (b[1] - a[1]) * u) | 0) + "," + ((a[2] + (b[2] - a[2]) * u) | 0) + ")");
+      }
+      function wideRaw(c, X, Y, s, w0, w1, t, style) {   // width axis: far letters narrow, near letters wide
+        var sx = S.widen ? 1 + (Math.min(1, t) - .5) * .9 * S.widen : 1;
+        if (sx === 1) return drawRaw(c, X + (w0 - w1) / 2 * s, Y, 0, s, style);
+        if (style !== lastStyle) { x.fillStyle = style; lastStyle = style; }
+        x.setTransform(sx * s * dpr, 0, 0, s * dpr, (X + (w0 - w1 * sx) / 2 * s) * dpr, Y * dpr); x.fillText(c, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      function growGlyph(b) {
+        var c = b[6], t = b[4], s = b[3], sc = s * (1 + t * 1.3 * S.strength), w = HW[c] || (HW[c] = x.measureText(c).width);
+        x.globalAlpha = b[5];
+        draw(c, b[1] - w * (sc - s) / 2, b[2] + S.size * .35 * (sc - s), 0, Math.max(heat[b[0]], t), 1, sc, b[1], b[2]);
+        x.globalAlpha = 1;
+      }
+      function stackDraw() {
+        if (!stk) return;
+        var K = stk.strips.length, k, tgt = mouse.on ? (mouse.x - W / 2) * .6 * S.strength : Math.sin(sec * .9) * W * .06 * S.strength;
+        stk.off[0] += (tgt - stk.off[0]) * (dt ? .25 : 1);
+        for (k = 1; k < K; k++) stk.off[k] += (stk.off[k - 1] - stk.off[k]) * (dt ? .3 : 1);
+        function al(k) { return S.reveal > 0 ? Math.max(0, Math.min(1, (sec - revealT0 - (k + 1) / (K + 1) * S.reveal) / .6)) : 1; }
+        x.globalAlpha = al(-1); if (x.globalAlpha > 0) draw(stk.word, stk.x, stk.y0, 0, 0, 1, 1, stk.x, stk.y0);
+        for (k = 0; k < K; k++) {
+          var a = al(k); if (a <= 0) continue;
+          var st = stk.strips[k], sy = st[1] / stk.band, ty = st[0] - (stk.y0 - stk.band) * sy, col = INK;
+          if (S.flow > 0) { var fc = palette(k / K * .6 + sec * S.flowSpeed * .17); col = [INK[0] + (fc[0] - INK[0]) * S.flow, INK[1] + (fc[1] - INK[1]) * S.flow, INK[2] + (fc[2] - INK[2]) * S.flow]; }
+          var h = Math.min(1, Math.abs(stk.off[k]) / (W * .4)) * Math.min(1, S.guiltRate);
+          x.save(); x.globalAlpha = a; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.beginPath(); x.rect(0, st[0], W, st[1] + .5); x.clip();
+          x.setTransform(dpr, 0, 0, dpr * sy, (stk.x + stk.off[k]) * dpr, ty * dpr);
+          x.fillStyle = "rgb(" + ((col[0] + (GU[0] - col[0]) * h) | 0) + "," + ((col[1] + (GU[1] - col[1]) * h) | 0) + "," + ((col[2] + (GU[2] - col[2]) * h) | 0) + ")";
+          x.fillText(stk.word, 0, stk.y0); x.restore(); lastStyle = "";
+        }
+        x.globalAlpha = 1; x.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
       function spinOf(j) { return S.spin ? Math.sin(sec * 1.7 + j * .73) * Math.PI * S.spin : 0; }
       function draw(ch_, X, Y, ang, h, a, sc, cx, cy) {
@@ -255,7 +323,7 @@
     }
     function drawRaw(c, X, Y, ang, sc, style) {
       if (style !== lastStyle) { x.fillStyle = style; lastStyle = style; }
-      sc = Math.round(sc * 16) / 16; ang = Math.round(ang * 24) / 24;
+      sc = Math.round(sc * 16) / 16; ang = Math.round((ang - baseAng) * 24) / 24 + baseAng;
       if (ang || sc !== 1) { var co = Math.cos(ang) * sc * dpr, si = Math.sin(ang) * sc * dpr; x.setTransform(co, si, -si, co, X * dpr, Y * dpr); x.fillText(c, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0); }
       else x.fillText(c, X, Y);
     }
