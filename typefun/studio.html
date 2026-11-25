@@ -31,7 +31,7 @@
   #rec{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);display:none;z-index:6;
     font:600 12px ui-monospace,Menlo,monospace;color:#fff;background:#d0202ecc;padding:7px 12px;white-space:nowrap;border-radius:16px;border:0;min-height:0!important}
   body.recording #rec{display:block}
-  body.recording .fab,body.recording #panel,body.recording #hud{display:none!important}
+  body.recording .fab:not(#miniRandom),body.recording #panel,body.recording #hud{display:none!important}
   body.recording{background:#000!important}
   #done{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:7;background:#14181df2;color:#e6e9ee;border:1px solid #3a424d;
     border-radius:10px;padding:14px;font:12px ui-monospace,Menlo,monospace;width:min(280px,calc(100vw - 32px));box-sizing:border-box;text-align:center}
